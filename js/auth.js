@@ -37,7 +37,7 @@ async function apiPost(payload) {
   return data;
 }
 function initTheme() {
-  const saved = localStorage.getItem("tutor_theme") || "dark";
+  const saved = localStorage.getItem("tutor_theme") || "light";
   document.documentElement.setAttribute("data-theme", saved);
   const btn = document.getElementById("themeBtn");
   if (btn) btn.addEventListener("click", () => {

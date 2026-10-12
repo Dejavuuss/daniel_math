@@ -8,7 +8,11 @@ document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", (
 }));
 async function loadData() {
  const status=document.getElementById("adminStatus"); status.textContent="Загружаем данные…";
- try { state=await apiGet(); fillStudents(); renderLists(); status.textContent="Синхронизировано с Google Sheets"; }
+ try { state=await apiGet(); fillStudents(); renderLists();
+ document.getElementById("statStudents").textContent=state.users.filter(u=>u.role==="student").length;
+ document.getElementById("statHomework").textContent=state.homework.length;
+ document.getElementById("statMaterials").textContent=state.materials.length;
+ status.textContent="● Синхронизировано с Google Sheets"; }
  catch(e){status.textContent="Ошибка: "+e.message;}
 }
 function fillStudents() {
@@ -18,11 +22,11 @@ function fillStudents() {
 }
 function table(rows, fields, sheet) {
  if(!rows.length) return '<p class="muted">Записей пока нет.</p>';
- return `<div class="table-wrap"><table><thead><tr>${fields.map(f=>`<th>${f[1]}</th>`).join("")}<th>Действие</th></tr></thead><tbody>${rows.map(r=>`<tr>${fields.map(f=>`<td>${esc(r[f[0]])}</td>`).join("")}<td><button class="danger" data-delete-sheet="${sheet}" data-delete-id="${esc(r.id)}">Удалить</button></td></tr>`).join("")}</tbody></table></div>`;
+ return `<div class="table-wrap"><table><thead><tr>${fields.map(f=>`<th>${f[1]}</th>`).join("")}<th>Действие</th></tr></thead><tbody>${rows.map(r=>`<tr>${fields.map(f=>`<td>${f[0]==="link" && r[f[0]] ? `<a href="${esc(r[f[0]])}" target="_blank" rel="noopener noreferrer">Открыть ↗</a>` : esc(r[f[0]])}</td>`).join("")}<td><button class="danger" data-delete-sheet="${sheet}" data-delete-id="${esc(r.id)}">Удалить</button></td></tr>`).join("")}</tbody></table></div>`;
 }
 function renderLists() {
  document.getElementById("l-materials").innerHTML=table(state.materials,[["title","Название"],["grade","Класс"],["url","Ссылка"]],"materials");
- document.getElementById("l-homework").innerHTML=table(state.homework,[["student","Ученик"],["title","Задание"],["assigned","Выдано"],["due","Дедлайн"],["status","Статус"]],"homework");
+ document.getElementById("l-homework").innerHTML=table(state.homework,[["student","Ученик"],["title","Задание"],["assigned","Выдано"],["due","Дедлайн"],["status","Статус"],["link","Ссылка"]],"homework");
  document.getElementById("l-schedule").innerHTML=table(state.schedule,[["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"]],"schedule");
  document.querySelectorAll("[data-delete-sheet]").forEach(btn=>btn.onclick=async()=>{
    if(!confirm("Удалить эту запись?"))return;
@@ -43,6 +47,6 @@ async function submitForm(form, action, map) {
  });
 }
 submitForm(document.getElementById("f-materials"),"addMaterial",d=>({title:d.title,grade:d.grade,url:d.url,description:d.description}));
-submitForm(document.getElementById("f-homework"),"addHomework",d=>({student:d.student,title:d.title,assigned:d.assigned,due:d.due}));
+submitForm(document.getElementById("f-homework"),"addHomework",d=>({student:d.student,title:d.title,assigned:d.assigned,due:d.due,link:d.link}));
 submitForm(document.getElementById("f-schedule"),"addEvent",d=>({date:d.date,time:d.time,type:d.type,title:d.title,description:d.description,student:d.student}));
 loadData();

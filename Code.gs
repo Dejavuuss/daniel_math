@@ -49,7 +49,7 @@ function doPost(e) {
         return json_({ ok: true, item: appendRecord_('homework', {
           id: nextId_('homework'), student: required_(payload.student, 'Ученик'),
           title: required_(payload.title, 'Задание'), assigned: required_(payload.assigned, 'Дата выдачи'),
-          due: required_(payload.due, 'Срок сдачи'), status: 'pending'
+          due: required_(payload.due, 'Срок сдачи'), status: 'pending', link: validateOptionalUrl_(payload.link)
         }) });
       case 'updateHomeworkStatus':
         return json_(updateHomeworkStatus_(user, payload));
@@ -176,6 +176,13 @@ function appendRecord_(name, record) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
   sheet.appendRow(headers.map(h => record[h] == null ? '' : record[h]));
   return record;
+}
+
+function validateOptionalUrl_(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  if (!/^https?:\/\//i.test(url)) throw new Error('Ссылка должна начинаться с https:// или http://.');
+  return url;
 }
 
 function required_(value, label) {
