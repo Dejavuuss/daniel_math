@@ -1,4 +1,5 @@
 const currentUser = requireAuth();
+if (currentUser && currentUser.role === "parent") location.replace("parent.html");
 let state = { users:[], materials:[], homework:[], schedule:[], settings:{} };
 document.getElementById("logoutBtn").onclick = logout;
 if (currentUser) {

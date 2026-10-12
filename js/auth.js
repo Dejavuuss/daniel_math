@@ -16,7 +16,10 @@ function requireAuth(role) {
   return user;
 }
 async function apiGet() {
-  const res = await fetch(APPS_SCRIPT_URL + "?_=" + Date.now(), { method:"GET", cache:"no-store" });
+  const user = getCurrentUser();
+  if (!user || !user.token) throw new Error("Войдите в систему заново.");
+  const query = new URLSearchParams({ _: String(Date.now()), username: user.username, token: user.token });
+  const res = await fetch(APPS_SCRIPT_URL + "?" + query.toString(), { method:"GET", cache:"no-store" });
   if (!res.ok) throw new Error("Ошибка загрузки данных (" + res.status + ")");
   const data = await res.json();
   if (data.ok === false) throw new Error(data.error || "Ошибка сервера");

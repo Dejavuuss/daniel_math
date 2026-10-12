@@ -1,196 +1,142 @@
 /**
- * Бэкенд сайта репетитора. Данные хранятся в Google Sheets.
- * ВАЖНО: POST из браузера отправляются с Content-Type: text/plain;charset=utf-8,
- * чтобы не вызывать CORS preflight. Apps Script Web App возвращает JSON через ContentService.
- *
- * Настройка: укажите ID таблицы в SPREADSHEET_ID либо привяжите скрипт к таблице
- * (тогда оставьте пустую строку). Деплой Web app: Execute as Me, Who has access: Anyone.
+ * API сайта репетитора: Google Apps Script + Google Sheets.
+ * POST отправляются с Content-Type: text/plain;charset=utf-8 — это позволяет
+ * избежать CORS preflight. Проверка прав выполняется на сервере по токену сессии.
  */
-const SPREADSHEET_ID = ''; // ID таблицы; пусто, если скрипт создан из Extensions → Apps Script
-const SHEETS = ['users', 'materials', 'homework', 'schedule'];
-const SESSION_TTL_SECONDS = 21600; // 6 часов
+const SPREADSHEET_ID = '';
+const SHEETS = ['users', 'materials', 'homework', 'schedule', 'grades'];
+const SESSION_TTL_SECONDS = 21600;
+const HEADERS = {
+  users: ['username','password','name','role','grade','child'],
+  materials: ['id','title','grade','url','description'],
+  homework: ['id','student','title','assigned','due','status','link'],
+  schedule: ['id','date','time','type','title','description','student'],
+  grades: ['id','student','subject','grade','date','comment']
+};
 
 function doGet(e) {
   try {
-    const ss = getSpreadsheet_();
-    const result = {};
-    SHEETS.forEach(name => {
-      const rows = readSheet_(ss, name);
-      // Пароли никогда не отправляются клиенту.
-      result[name] = name === 'users' ? rows.map(publicUser_) : rows;
-    });
-    result.settings = { year: 2026 };
+    const params = (e && e.parameter) || {};
+    const user = validateSession_(params.token, params.username);
+    if (!user) return json_({ ok:false, error:'Сессия истекла или не найдена. Войдите снова.' });
+    const ss = getSpreadsheet_(); ensureSchema_(ss);
+    const allUsers = readSheet_(ss, 'users');
+    const safeUsers = allUsers.map(publicUser_);
+    const result = { settings:{year:2026}, users:[], materials:[], homework:[], schedule:[], grades:[] };
+    if (String(user.role) === 'admin') {
+      result.users = safeUsers;
+      result.materials = readSheet_(ss,'materials');
+      result.homework = readSheet_(ss,'homework');
+      result.schedule = readSheet_(ss,'schedule');
+      result.grades = readSheet_(ss,'grades');
+    } else {
+      const childUsername = String(user.role) === 'parent' ? String(user.child || '') : String(user.username);
+      const child = allUsers.find(u => String(u.username) === childUsername && String(u.role) === 'student');
+      result.users = [publicUser_(user)];
+      if (child) result.users.push(publicUser_(child));
+      result.materials = readSheet_(ss,'materials').filter(m => !m.grade || !child || String(m.grade) === String(child.grade));
+      result.homework = readSheet_(ss,'homework').filter(h => String(h.student) === childUsername);
+      result.schedule = readSheet_(ss,'schedule').filter(ev => !ev.student || String(ev.student) === childUsername);
+      result.grades = readSheet_(ss,'grades').filter(g => String(g.student) === childUsername);
+    }
     return json_(result);
-  } catch (err) {
-    return json_({ ok: false, error: String(err.message || err) });
-  }
+  } catch (err) { return json_({ok:false,error:String(err.message || err)}); }
 }
 
 function doPost(e) {
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const action = String(payload.action || '');
-    if (action === 'login') return json_(login_(payload.username, payload.password));
-
-    // Все операции кроме login требуют выданной сервером сессии.
-    const user = validateSession_(payload.token, payload.username);
-    if (!user) return json_({ ok: false, error: 'Сессия истекла. Войдите снова.' });
-
+    const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const action = String(p.action || '');
+    if (action === 'login') return json_(login_(p.username, p.password));
+    const user = validateSession_(p.token, p.username);
+    if (!user) return json_({ok:false,error:'Сессия истекла. Войдите снова.'});
+    const ss = getSpreadsheet_(); ensureSchema_(ss);
     switch (action) {
       case 'addMaterial':
         requireAdmin_(user);
-        return json_({ ok: true, item: appendRecord_('materials', {
-          id: nextId_('materials'), title: required_(payload.title, 'Название'),
-          grade: payload.grade === '' || payload.grade == null ? '' : Number(payload.grade),
-          url: String(payload.url || ''), description: String(payload.description || '')
-        }) });
+        return json_({ok:true,item:appendRecord_('materials',{id:nextId_('materials'),title:required_(p.title,'Название'),grade:p.grade===''||p.grade==null?'':Number(p.grade),url:validateOptionalUrl_(p.url),description:String(p.description||'')})});
       case 'addHomework':
         requireAdmin_(user);
-        return json_({ ok: true, item: appendRecord_('homework', {
-          id: nextId_('homework'), student: required_(payload.student, 'Ученик'),
-          title: required_(payload.title, 'Задание'), assigned: required_(payload.assigned, 'Дата выдачи'),
-          due: required_(payload.due, 'Срок сдачи'), status: 'pending', link: validateOptionalUrl_(payload.link)
-        }) });
-      case 'updateHomeworkStatus':
-        return json_(updateHomeworkStatus_(user, payload));
+        return json_({ok:true,item:appendRecord_('homework',{id:nextId_('homework'),student:required_(p.student,'Ученик'),title:required_(p.title,'Задание'),assigned:required_(p.assigned,'Дата выдачи'),due:required_(p.due,'Срок сдачи'),status:'pending',link:validateOptionalUrl_(p.link)})});
+      case 'updateHomeworkStatus': return json_(updateHomeworkStatus_(user,p));
       case 'addEvent':
         requireAdmin_(user);
-        return json_({ ok: true, item: appendRecord_('schedule', {
-          id: nextId_('schedule'), date: required_(payload.date, 'Дата'),
-          time: String(payload.time || ''), type: required_(payload.type, 'Тип'),
-          title: required_(payload.title, 'Название'), description: String(payload.description || ''),
-          student: String(payload.student || '')
-        }) });
-      case 'deleteRow':
+        return json_({ok:true,item:appendRecord_('schedule',{id:nextId_('schedule'),date:required_(p.date,'Дата'),time:String(p.time||''),type:required_(p.type,'Тип'),title:required_(p.title,'Название'),description:String(p.description||''),student:String(p.student||'')})});
+      case 'addParent':
         requireAdmin_(user);
-        return json_(deleteRow_(payload));
-      default:
-        return json_({ ok: false, error: 'Неизвестное действие.' });
+        return json_({ok:true,item:addParent_(p)});
+      case 'addGrade':
+        requireAdmin_(user);
+        const grade = Number(p.grade);
+        if (!Number.isFinite(grade) || grade < 1 || grade > 5) throw new Error('Оценка должна быть от 1 до 5.');
+        return json_({ok:true,item:appendRecord_('grades',{id:nextId_('grades'),student:required_(p.student,'Ученик'),subject:validateSubject_(p.subject),grade:grade,date:required_(p.date,'Дата'),comment:String(p.comment||'')})});
+      case 'deleteRow': requireAdmin_(user); return json_(deleteRow_(p));
+      default: return json_({ok:false,error:'Неизвестное действие.'});
     }
-  } catch (err) {
-    return json_({ ok: false, error: String(err.message || err) });
-  }
+  } catch (err) { return json_({ok:false,error:String(err.message || err)}); }
 }
 
-function login_(username, password) {
-  username = String(username || '').trim();
-  password = String(password || '');
-  const user = readSheet_(getSpreadsheet_(), 'users').find(u => String(u.username).toLowerCase() === username.toLowerCase());
-  if (!user || String(user.password) !== password) return { ok: false, error: 'Неверный логин или пароль.' };
-  const safeUser = publicUser_(user);
-  const token = Utilities.getUuid() + Utilities.getUuid();
-  CacheService.getScriptCache().put('session:' + token, JSON.stringify({ username: safeUser.username }), SESSION_TTL_SECONDS);
-  return { ok: true, user: safeUser, token: token };
+function login_(username,password) {
+  username=String(username||'').trim(); password=String(password||'');
+  const user=readSheet_(getSpreadsheet_(),'users').find(u=>String(u.username).toLowerCase()===username.toLowerCase());
+  if(!user || String(user.password)!==password) return {ok:false,error:'Неверный логин или пароль.'};
+  const safe=publicUser_(user), token=Utilities.getUuid()+Utilities.getUuid();
+  CacheService.getScriptCache().put('session:'+token,JSON.stringify({username:safe.username}),SESSION_TTL_SECONDS);
+  return {ok:true,user:safe,token:token};
 }
-
-function validateSession_(token, username) {
-  if (!token || !username) return null;
-  const cache = CacheService.getScriptCache();
-  const raw = cache.get('session:' + String(token));
-  if (!raw) return null;
-  const session = JSON.parse(raw);
-  if (session.username !== String(username)) return null;
-  // Роль читается заново из таблицы, а не доверяется данным браузера.
-  return readSheet_(getSpreadsheet_(), 'users').find(u => String(u.username) === session.username) || null;
+function validateSession_(token,username) {
+  if(!token||!username)return null;
+  const raw=CacheService.getScriptCache().get('session:'+String(token)); if(!raw)return null;
+  const session=JSON.parse(raw); if(session.username!==String(username))return null;
+  return readSheet_(getSpreadsheet_(),'users').find(u=>String(u.username)===session.username)||null;
 }
-
-function updateHomeworkStatus_(user, payload) {
-  const id = String(payload.homeworkId == null ? '' : payload.homeworkId);
-  const status = String(payload.status || '');
-  if (!id || !['pending', 'done'].includes(status)) throw new Error('Некорректный ID или статус.');
-  const ss = getSpreadsheet_(), sheet = ss.getSheetByName('homework');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(String);
-  const idCol = headers.indexOf('id'), studentCol = headers.indexOf('student'), statusCol = headers.indexOf('status');
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === id) {
-      if (String(user.role) !== 'admin' && String(data[i][studentCol]) !== String(user.username)) {
-        throw new Error('Нельзя изменять чужое домашнее задание.');
-      }
-      sheet.getRange(i + 1, statusCol + 1).setValue(status);
-      return { ok: true, homeworkId: id, status: status };
-    }
+function addParent_(p) {
+  const username=required_(p.username,'Логин').trim();
+  if(!/^[a-zA-Z0-9._-]{3,40}$/.test(username))throw new Error('Логин: 3–40 символов, латиница, цифры, точка, дефис или подчёркивание.');
+  const ss=getSpreadsheet_(), users=readSheet_(ss,'users');
+  if(users.some(u=>String(u.username).toLowerCase()===username.toLowerCase()))throw new Error('Такой логин уже существует.');
+  const password=required_(p.password,'Пароль'); if(password.length<6)throw new Error('Пароль должен содержать не менее 6 символов.');
+  const child=required_(p.child,'Ученик');
+  if(!users.some(u=>String(u.username)===child&&String(u.role)==='student'))throw new Error('Выбранный ученик не найден.');
+  const created = appendRecord_('users',{username,password,name:required_(p.name,'Имя родителя'),role:'parent',grade:'',child:child});
+  return publicUser_(created);
+}
+function updateHomeworkStatus_(user,p) {
+  const id=String(p.homeworkId==null?'':p.homeworkId), status=String(p.status||'');
+  if(!id||!['pending','done'].includes(status))throw new Error('Некорректный ID или статус.');
+  const sheet=getSpreadsheet_().getSheetByName('homework'), data=sheet.getDataRange().getValues(), headers=data[0].map(String);
+  const idCol=headers.indexOf('id'), studentCol=headers.indexOf('student'), statusCol=headers.indexOf('status');
+  for(let i=1;i<data.length;i++)if(String(data[i][idCol])===id){
+    const allowed=String(user.role)==='admin'||String(data[i][studentCol])===String(user.username)||(String(user.role)==='parent'&&String(data[i][studentCol])===String(user.child||''));
+    if(!allowed)throw new Error('Нельзя изменять чужое домашнее задание.');
+    sheet.getRange(i+1,statusCol+1).setValue(status); return {ok:true,homeworkId:id,status};
   }
   throw new Error('Домашнее задание не найдено.');
 }
-
-function deleteRow_(payload) {
-  const name = String(payload.sheet || '');
-  const id = String(payload.id == null ? '' : payload.id);
-  if (!['materials', 'homework', 'schedule'].includes(name) || !id) throw new Error('Некорректная запись для удаления.');
-  const sheet = getSpreadsheet_().getSheetByName(name);
-  if (!sheet) throw new Error('Лист не найден: ' + name);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(String), idCol = headers.indexOf('id');
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === id) {
-      sheet.deleteRow(i + 1);
-      return { ok: true };
-    }
-  }
+function deleteRow_(p) {
+  const name=String(p.sheet||''),id=String(p.id==null?'':p.id);
+  if(!['materials','homework','schedule','grades'].includes(name)||!id)throw new Error('Некорректная запись для удаления.');
+  const sheet=getSpreadsheet_().getSheetByName(name),data=sheet.getDataRange().getValues(),col=data[0].map(String).indexOf('id');
+  for(let i=1;i<data.length;i++)if(String(data[i][col])===id){sheet.deleteRow(i+1);return {ok:true};}
   throw new Error('Запись не найдена.');
 }
-
-function requireAdmin_(user) {
-  if (String(user.role) !== 'admin') throw new Error('Недостаточно прав: требуется администратор.');
-}
-
-function getSpreadsheet_() {
-  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) throw new Error('Укажите SPREADSHEET_ID в Code.gs.');
-  return ss;
-}
-
-function readSheet_(ss, name) {
-  const sheet = ss.getSheetByName(name);
-  if (!sheet) throw new Error('Не найден лист "' + name + '". Создайте лист и заголовки из README.');
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  const headers = values[0].map(String);
-  return values.slice(1).filter(row => row.some(v => v !== '')).map(row => {
-    const obj = {};
-    headers.forEach((key, i) => obj[key] = normalizeCell_(row[i]));
-    return obj;
+function requireAdmin_(u){if(String(u.role)!=='admin')throw new Error('Недостаточно прав: требуется администратор.');}
+function getSpreadsheet_(){if(SPREADSHEET_ID)return SpreadsheetApp.openById(SPREADSHEET_ID);const ss=SpreadsheetApp.getActiveSpreadsheet();if(!ss)throw new Error('Укажите SPREADSHEET_ID в Code.gs.');return ss;}
+function ensureSchema_(ss){
+  Object.keys(HEADERS).forEach(name=>{
+    let sh=ss.getSheetByName(name);
+    if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,HEADERS[name].length).setValues([HEADERS[name]]);return;}
+    if(sh.getLastRow()===0){sh.getRange(1,1,1,HEADERS[name].length).setValues([HEADERS[name]]);return;}
+    const current=sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0].map(String);
+    HEADERS[name].forEach(h=>{if(current.indexOf(h)<0){sh.getRange(1,sh.getLastColumn()+1).setValue(h);current.push(h);}});
   });
 }
-
-function normalizeCell_(value) {
-  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  return value;
-}
-
-function publicUser_(user) {
-  return { username: String(user.username || ''), name: String(user.name || ''),
-    role: String(user.role || 'student'), grade: user.grade === '' || user.grade == null ? '' : user.grade };
-}
-
-function nextId_(name) {
-  const ids = readSheet_(getSpreadsheet_(), name).map(r => Number(r.id) || 0);
-  return Math.max(0, ...ids) + 1;
-}
-
-function appendRecord_(name, record) {
-  const sheet = getSpreadsheet_().getSheetByName(name);
-  if (!sheet) throw new Error('Не найден лист "' + name + '".');
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
-  sheet.appendRow(headers.map(h => record[h] == null ? '' : record[h]));
-  return record;
-}
-
-function validateOptionalUrl_(value) {
-  const url = String(value || '').trim();
-  if (!url) return '';
-  if (!/^https?:\/\//i.test(url)) throw new Error('Ссылка должна начинаться с https:// или http://.');
-  return url;
-}
-
-function required_(value, label) {
-  const s = String(value == null ? '' : value).trim();
-  if (!s) throw new Error('Заполните поле: ' + label + '.');
-  return s;
-}
-
-function json_(value) {
-  return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
-}
+function readSheet_(ss,name){const sh=ss.getSheetByName(name);if(!sh)throw new Error('Не найден лист "'+name+'".');const values=sh.getDataRange().getValues();if(values.length<2)return [];const headers=values[0].map(String);return values.slice(1).filter(r=>r.some(v=>v!=='')).map(r=>{const o={};headers.forEach((h,i)=>o[h]=normalizeCell_(r[i]));return o;});}
+function normalizeCell_(v){if(v instanceof Date)return Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');return v;}
+function publicUser_(u){return {username:String(u.username||''),name:String(u.name||''),role:String(u.role||'student'),grade:u.grade===''||u.grade==null?'':u.grade,child:String(u.child||'')};}
+function nextId_(name){return Math.max(0,...readSheet_(getSpreadsheet_(),name).map(r=>Number(r.id)||0))+1;}
+function appendRecord_(name,record){const sh=getSpreadsheet_().getSheetByName(name);if(!sh)throw new Error('Не найден лист: '+name);const headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(String);sh.appendRow(headers.map(h=>record[h]==null?'':record[h]));return record;}
+function validateOptionalUrl_(v){const s=String(v||'').trim();if(s&&!/^https?:\/\//i.test(s))throw new Error('Ссылка должна начинаться с https:// или http://.');return s;}
+function validateSubject_(v){const s=String(v||'');if(!['Математика','Алгебра','Геометрия'].includes(s))throw new Error('Выберите предмет: математика, алгебра или геометрия.');return s;}
+function required_(v,label){const s=String(v==null?'':v).trim();if(!s)throw new Error('Заполните поле: '+label+'.');return s;}
+function json_(v){return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON);}

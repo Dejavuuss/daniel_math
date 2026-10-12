@@ -6,15 +6,15 @@
 <form id="loginForm"><label for="loginUsername">Логин</label><input id="loginUsername" autocomplete="username" required>
 <label for="loginPassword">Пароль</label><input id="loginPassword" type="password" autocomplete="current-password" required>
 <button class="primary" type="submit" id="loginBtn">Войти →</button><p id="loginError" class="error" role="alert"></p></form>
-<p class="muted small">Данные кабинета обновляются через Google Sheets.</p></section></main>
+<p class="muted small">Данные кабинета обновляются через Google Sheets.</p><aside class="quote">«Математика — царица наук». <span>— Карл Фридрих Гаусс</span></aside></section></main>
 <script src="js/auth.js"></script><script>
-if (getCurrentUser()) location.replace(getCurrentUser().role === 'admin' ? 'admin.html' : 'dashboard.html');
+if (getCurrentUser()) location.replace(getCurrentUser().role === 'admin' ? 'admin.html' : getCurrentUser().role === 'parent' ? 'parent.html' : 'dashboard.html');
 document.getElementById('loginForm').addEventListener('submit', async e => {
  e.preventDefault(); const btn=document.getElementById('loginBtn'), err=document.getElementById('loginError');
  btn.disabled=true; btn.textContent='Входим…'; err.textContent='';
  try { const data=await apiPost({action:'login',username:document.getElementById('loginUsername').value.trim(),password:document.getElementById('loginPassword').value});
  if(!data.ok) throw new Error(data.error||'Не удалось войти');
- saveCurrentUser(data.user,data.token); location.href=data.user.role==='admin'?'admin.html':'dashboard.html';
+ saveCurrentUser(data.user,data.token); location.href=data.user.role==='admin'?'admin.html':data.user.role==='parent'?'parent.html':'dashboard.html';
  } catch(ex) { err.textContent=ex.message; } finally {btn.disabled=false;btn.textContent='Войти →';}
 });
 </script></body></html>
