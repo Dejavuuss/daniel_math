@@ -1,0 +1,7 @@
+[
+  { "id": 1, "title": "Квадратные уравнения", "grade": 8, "url": "files/quadratic.pdf", "description": "Конспект + примеры" },
+  { "id": 2, "title": "Тригонометрия: основные формулы", "grade": 9, "url": "files/trig.pdf", "description": "Шпаргалка и разбор типовых задач" },
+  { "id": 3, "title": "Системы уравнений", "grade": 9, "url": "https://example.com/systems", "description": "Методы подстановки и сложения" },
+  { "id": 4, "title": "Производная и её применение", "grade": 11, "url": "files/derivative.pdf", "description": "Теория и задачи уровня ЕГЭ" },
+  { "id": 5, "title": "Таблица квадратов и формулы сокращённого умножения", "url": "files/formulas.pdf", "description": "Общий материал для всех классов" }
+]

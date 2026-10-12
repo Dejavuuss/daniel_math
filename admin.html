@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Панель репетитора</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container">
+      <h1>⚙️ Панель репетитора</h1>
+      <div class="actions">
+        <a class="btn" href="dashboard.html">Кабинет</a>
+        <button id="themeBtn">🌓</button>
+        <button id="logoutBtn">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="notice">
+      Сайт статический: изменения сначала попадают в черновик в этом браузере. Чтобы они появились у учеников,
+      нажмите «Скачать JSON» и закоммитьте файл в репозиторий — или отправьте его через GitHub API (блок внизу).
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="t-materials">📚 Материалы</button>
+      <button class="tab" data-tab="t-homework">📝 Задания</button>
+      <button class="tab" data-tab="t-schedule">📅 События</button>
+      <button class="tab" data-tab="t-users">👤 Ученики</button>
+    </div>
+
+    <section id="t-materials" class="tab-panel active card">
+      <form id="f-materials">
+        <div class="grid2">
+          <div><label>Название</label><input name="title" required></div>
+          <div><label>Класс (пусто — для всех)</label><input name="grade" type="number" min="1" max="11"></div>
+        </div>
+        <label>Ссылка / путь к PDF</label><input name="url" placeholder="files/quadratic.pdf или https://...">
+        <label>Описание</label><input name="description">
+        <p><button class="primary" type="submit">Добавить</button></p>
+      </form>
+      <div id="l-materials"></div>
+      <button data-download="materials">⬇️ Скачать materials.json</button>
+    </section>
+
+    <section id="t-homework" class="tab-panel card">
+      <form id="f-homework">
+        <div class="grid2">
+          <div><label>Ученик</label><select name="student" id="studentSelect" required></select></div>
+          <div><label>Задание</label><input name="title" required placeholder="№ 245–250"></div>
+          <div><label>Выдано</label><input name="assigned" type="date" required></div>
+          <div><label>Дедлайн</label><input name="due" type="date" required></div>
+        </div>
+        <p><button class="primary" type="submit">Добавить</button></p>
+      </form>
+      <div id="l-homework"></div>
+      <button data-download="homework">⬇️ Скачать homework.json</button>
+    </section>
+
+    <section id="t-schedule" class="tab-panel card">
+      <form id="f-schedule">
+        <div class="grid2">
+          <div><label>Дата (2026)</label><input name="date" type="date" min="2026-01-01" max="2026-12-31" required></div>
+          <div><label>Время</label><input name="time" type="time"></div>
+          <div><label>Тип</label>
+            <select name="type">
+              <option value="lesson">🔵 Занятие</option>
+              <option value="deadline">🟠 Дедлайн ДЗ</option>
+              <option value="test">🔴 Контрольная</option>
+              <option value="olympiad">🟢 Олимпиада</option>
+            </select></div>
+          <div><label>Для ученика (пусто — для всех)</label><select name="student" id="eventStudent"></select></div>
+        </div>
+        <label>Описание</label><input name="title" required>
+        <p><button class="primary" type="submit">Добавить</button></p>
+      </form>
+      <div id="l-schedule"></div>
+      <button data-download="schedule">⬇️ Скачать schedule.json</button>
+    </section>
+
+    <section id="t-users" class="tab-panel card">
+      <form id="f-users">
+        <div class="grid2">
+          <div><label>Логин</label><input name="login" required></div>
+          <div><label>Имя</label><input name="name" required></div>
+          <div><label>Пароль</label><input name="password" type="text" required></div>
+          <div><label>Класс</label><input name="grade" type="number" min="1" max="11" required></div>
+        </div>
+        <label class="check"><input type="checkbox" name="hash" checked> Сохранить пароль как SHA-256-хеш (не в открытом виде)</label>
+        <p><button class="primary" type="submit">Добавить ученика</button></p>
+      </form>
+      <div id="l-users"></div>
+      <button data-download="users">⬇️ Скачать users.json</button>
+    </section>
+
+    <section class="card">
+      <h3>Отправка в GitHub (необязательно)</h3>
+      <p class="muted">Нужен персональный токен с правом Contents: write только на этот репозиторий. Токен хранится в localStorage этого браузера — используйте только на своём устройстве.</p>
+      <div class="grid2">
+        <div><label>Репозиторий (владелец/имя)</label><input id="ghRepo" placeholder="username/math-tutor-site"></div>
+        <div><label>Ветка</label><input id="ghBranch" value="main"></div>
+      </div>
+      <label>Токен</label><input id="ghToken" type="password" placeholder="github_pat_...">
+      <p>
+        <button id="ghSave">Запомнить настройки</button>
+        <button class="primary" id="ghPush">⬆️ Закоммитить все JSON</button>
+      </p>
+      <div id="ghStatus" class="muted"></div>
+    </section>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
