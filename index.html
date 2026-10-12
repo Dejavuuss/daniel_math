@@ -1,28 +1,20 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Репетитор по математике — вход</title>
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-  <div class="login-wrap">
-    <div class="card login-card">
-      <h1>📐 Математика с Марией Ивановной</h1>
-      <p class="muted" style="text-align:center">Личный кабинет ученика</p>
-      <form id="loginForm">
-        <label for="loginName">Имя (логин)</label>
-        <input id="loginName" autocomplete="username" required>
-        <label for="password">Пароль</label>
-        <input id="password" type="password" autocomplete="current-password" required>
-        <label class="check"><input type="checkbox" id="remember"> Запомнить меня</label>
-        <button class="primary" type="submit">Войти</button>
-        <div class="error" id="loginError"></div>
-      </form>
-      <div style="text-align:center"><button id="themeBtn" type="button">🌓 Тема</button></div>
-    </div>
-  </div>
-  <script src="js/auth.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Вход — Математика с репетитором</title><link rel="stylesheet" href="css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"></head>
+<body><main class="login-wrap"><section class="card login-card"><div class="brand-mark">∑</div><h1>Математика с репетитором</h1><p class="muted center">Войдите в личный кабинет</p>
+<form id="loginForm"><label for="loginUsername">Логин</label><input id="loginUsername" autocomplete="username" required>
+<label for="loginPassword">Пароль</label><input id="loginPassword" type="password" autocomplete="current-password" required>
+<button class="primary" type="submit" id="loginBtn">Войти →</button><p id="loginError" class="error" role="alert"></p></form>
+<p class="muted small">Данные кабинета обновляются через Google Sheets.</p></section></main>
+<script src="js/auth.js"></script><script>
+if (getCurrentUser()) location.replace(getCurrentUser().role === 'admin' ? 'admin.html' : 'dashboard.html');
+document.getElementById('loginForm').addEventListener('submit', async e => {
+ e.preventDefault(); const btn=document.getElementById('loginBtn'), err=document.getElementById('loginError');
+ btn.disabled=true; btn.textContent='Входим…'; err.textContent='';
+ try { const data=await apiPost({action:'login',username:document.getElementById('loginUsername').value.trim(),password:document.getElementById('loginPassword').value});
+ if(!data.ok) throw new Error(data.error||'Не удалось войти');
+ saveCurrentUser(data.user,data.token); location.href=data.user.role==='admin'?'admin.html':'dashboard.html';
+ } catch(ex) { err.textContent=ex.message; } finally {btn.disabled=false;btn.textContent='Войти →';}
+});
+</script></body></html>

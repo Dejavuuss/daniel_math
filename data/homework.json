@@ -1,7 +1,0 @@
-[
-  { "id": 1, "student": "ivan", "title": "№ 245–250", "assigned": "2026-01-15", "due": "2026-01-22", "status": "pending" },
-  { "id": 2, "student": "ivan", "title": "Системы уравнений, № 310–315", "assigned": "2026-10-05", "due": "2026-10-19", "status": "pending" },
-  { "id": 3, "student": "anna", "title": "Дискриминант: № 120–126", "assigned": "2026-10-08", "due": "2026-10-15", "status": "done" },
-  { "id": 4, "student": "anna", "title": "Теорема Виета, № 130–134", "assigned": "2026-10-12", "due": "2026-10-20", "status": "pending" },
-  { "id": 5, "student": "oleg", "title": "Производные: вариант 3 (ЕГЭ)", "assigned": "2026-10-10", "due": "2026-10-24", "status": "pending" }
-]

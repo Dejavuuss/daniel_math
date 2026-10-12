@@ -24,7 +24,7 @@ function renderCalendar(root, events) {
   let selected = null;
 
   const byDate = {};
-  events.forEach(ev => { (byDate[ev.date] = byDate[ev.date] || []).push(ev); });
+  events.forEach(ev => { const date = String(ev.date || "").slice(0, 10); if (date) (byDate[date] = byDate[date] || []).push(Object.assign({}, ev, {date})); });
   Object.values(byDate).forEach(list => list.sort((a, b) => (a.time || "").localeCompare(b.time || "")));
 
   function draw() {
@@ -72,7 +72,7 @@ function renderCalendar(root, events) {
     evs.forEach(ev => {
       const t = TYPE_INFO[ev.type] || { label: ev.type, icon: "⚪" };
       html += `<div class="ev ${escapeHtml(ev.type)}">
-        <strong>${t.icon} ${t.label}${ev.time ? " · " + escapeHtml(ev.time) : ""}</strong><br>${escapeHtml(ev.title)}
+        <strong>${t.icon} ${t.label}${ev.time ? " · " + escapeHtml(ev.time) : ""}</strong><br>${escapeHtml(ev.title)}${ev.description ? `<div class="muted">${escapeHtml(ev.description)}</div>` : ""}
       </div>`;
     });
     box.innerHTML = html;

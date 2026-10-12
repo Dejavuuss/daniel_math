@@ -1,37 +1,10 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Личный кабинет</title>
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-  <header class="topbar">
-    <div class="container">
-      <h1 id="greeting">Привет!</h1>
-      <div class="actions">
-        <a class="btn" id="adminLink" href="admin.html" hidden>⚙️ Админка</a>
-        <button id="themeBtn">🌓</button>
-        <button id="logoutBtn">Выйти</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="container">
-    <div class="tabs">
-      <button class="tab active" data-tab="materials">📚 Учебные материалы</button>
-      <button class="tab" data-tab="homework">📝 Домашние задания</button>
-      <button class="tab" data-tab="calendar">📅 Календарь 2026</button>
-    </div>
-
-    <section id="materials" class="tab-panel active card"></section>
-    <section id="homework" class="tab-panel card"></section>
-    <section id="calendar" class="tab-panel card"></section>
-  </main>
-
-  <script src="js/auth.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/dashboard.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Кабинет ученика</title><link rel="stylesheet" href="css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"></head>
+<body><header class="topbar"><div class="container"><div><div class="eyebrow">ЛИЧНЫЙ КАБИНЕТ</div><h1 id="greeting">Привет!</h1></div><div class="actions"><a id="adminLink" class="btn" href="admin.html" hidden>Панель репетитора</a><button id="themeBtn" aria-label="Сменить тему">◐</button><button id="logoutBtn">Выйти ↗</button></div></div></header>
+<main class="container"><div id="loadStatus" class="muted small">Загружаем данные…</div>
+<nav class="tabs"><button class="tab active" data-tab="t-materials">📚 Материалы</button><button class="tab" data-tab="t-homework">📝 Домашние задания</button><button class="tab" data-tab="t-calendar">📅 Календарь 2026</button></nav>
+<section id="t-materials" class="tab-panel active card"><div class="section-heading"><h2>Материалы</h2><span class="eyebrow">ПО ТВОЕМУ КЛАССУ</span></div><div id="materials"></div></section>
+<section id="t-homework" class="tab-panel card"><div class="section-heading"><h2>Домашние задания</h2><span class="eyebrow">ТВОЙ ПРОГРЕСС</span></div><div id="homework"></div></section>
+<section id="t-calendar" class="tab-panel card"><div class="section-heading"><h2>Календарь 2026</h2><span class="eyebrow">РАСПИСАНИЕ</span></div><div id="calendar"></div></section>
+</main><script src="js/auth.js"></script><script src="js/calendar.js"></script><script src="js/dashboard.js"></script></body></html>

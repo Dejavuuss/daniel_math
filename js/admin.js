@@ -1,179 +1,48 @@
-const session = requireAuth("admin");
-
-const FILES = ["materials", "homework", "schedule", "users"];
-const store = {};
-
-const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const draftKey = n => "tutor_draft_" + n;
-
-function persist(name) {
-  localStorage.setItem(draftKey(name), JSON.stringify(store[name]));
+const adminUser = requireAuth("admin");
+let state = {users:[],materials:[],homework:[],schedule:[],settings:{}};
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+document.getElementById("logoutBtn").onclick = logout;
+document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
+ document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
+ document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id===btn.dataset.tab));
+}));
+async function loadData() {
+ const status=document.getElementById("adminStatus"); status.textContent="Загружаем данные…";
+ try { state=await apiGet(); fillStudents(); renderLists(); status.textContent="Синхронизировано с Google Sheets"; }
+ catch(e){status.textContent="Ошибка: "+e.message;}
 }
-
-function nextId(list) {
-  return list.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
+function fillStudents() {
+ const opts=state.users.filter(u=>u.role==="student").map(u=>`<option value="${esc(u.username)}">${esc(u.name)} (${esc(u.username)})</option>`).join("");
+ document.getElementById("studentSelect").innerHTML=opts;
+ document.getElementById("eventStudent").innerHTML='<option value="">Все ученики</option>'+opts;
 }
-
-function download(name) {
-  const blob = new Blob([JSON.stringify(store[name], null, 2) + "\n"], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name + ".json";
-  a.click();
-  URL.revokeObjectURL(a.href);
+function table(rows, fields, sheet) {
+ if(!rows.length) return '<p class="muted">Записей пока нет.</p>';
+ return `<div class="table-wrap"><table><thead><tr>${fields.map(f=>`<th>${f[1]}</th>`).join("")}<th>Действие</th></tr></thead><tbody>${rows.map(r=>`<tr>${fields.map(f=>`<td>${esc(r[f[0]])}</td>`).join("")}<td><button class="danger" data-delete-sheet="${sheet}" data-delete-id="${esc(r.id)}">Удалить</button></td></tr>`).join("")}</tbody></table></div>`;
 }
-
-function students() {
-  return store.users.filter(u => u.role === "student");
-}
-
-function fillStudentSelects() {
-  const opts = students().map(u => `<option value="${esc(u.login)}">${esc(u.name)} (${esc(u.login)})</option>`).join("");
-  document.getElementById("studentSelect").innerHTML = opts;
-  document.getElementById("eventStudent").innerHTML = `<option value="">Все</option>` + opts;
-}
-
-function table(name, cols, rows) {
-  if (!rows.length) return `<p class="muted">Записей нет.</p>`;
-  return `<div style="overflow-x:auto"><table>
-    <tr>${cols.map(c => `<th>${c[1]}</th>`).join("")}<th></th></tr>
-    ${rows.map((r, i) => `<tr>${cols.map(c => `<td>${esc(r[c[0]])}</td>`).join("")}
-      <td><button class="danger" data-del="${name}" data-i="${i}">✕</button></td></tr>`).join("")}
-  </table></div>`;
-}
-
 function renderLists() {
-  document.getElementById("l-materials").innerHTML = table("materials",
-    [["title", "Название"], ["grade", "Класс"], ["url", "Ссылка"]], store.materials);
-  document.getElementById("l-homework").innerHTML = table("homework",
-    [["student", "Ученик"], ["title", "Задание"], ["assigned", "Выдано"], ["due", "Дедлайн"], ["status", "Статус"]], store.homework);
-  document.getElementById("l-schedule").innerHTML = table("schedule",
-    [["date", "Дата"], ["time", "Время"], ["type", "Тип"], ["title", "Описание"], ["student", "Ученик"]],
-    store.schedule);
-  document.getElementById("l-users").innerHTML = table("users",
-    [["login", "Логин"], ["name", "Имя"], ["role", "Роль"], ["grade", "Класс"]], store.users);
-
-  document.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
-    const name = b.dataset.del;
-    const item = store[name][+b.dataset.i];
-    if (name === "users" && item.role === "admin") { alert("Админа удалять нельзя."); return; }
-    if (!confirm("Удалить запись?")) return;
-    store[name].splice(+b.dataset.i, 1);
-    persist(name);
-    fillStudentSelects();
-    renderLists();
-  });
+ document.getElementById("l-materials").innerHTML=table(state.materials,[["title","Название"],["grade","Класс"],["url","Ссылка"]],"materials");
+ document.getElementById("l-homework").innerHTML=table(state.homework,[["student","Ученик"],["title","Задание"],["assigned","Выдано"],["due","Дедлайн"],["status","Статус"]],"homework");
+ document.getElementById("l-schedule").innerHTML=table(state.schedule,[["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"]],"schedule");
+ document.querySelectorAll("[data-delete-sheet]").forEach(btn=>btn.onclick=async()=>{
+   if(!confirm("Удалить эту запись?"))return;
+   const sheet=btn.dataset.deleteSheet,id=btn.dataset.deleteId, list=state[sheet], index=list.findIndex(x=>String(x.id)===String(id));
+   if(index<0)return; const [removed]=list.splice(index,1); renderLists();
+   try { await apiPost({action:"deleteRow",sheet,id}); await loadData(); }
+   catch(e){list.splice(index,0,removed);renderLists();alert("Не удалось удалить: "+e.message);}
+ });
 }
-
-function formData(form) {
-  const o = {};
-  new FormData(form).forEach((v, k) => { o[k] = v; });
-  return o;
+function formData(form){const o={};new FormData(form).forEach((v,k)=>o[k]=v);return o;}
+async function submitForm(form, action, map) {
+ form.addEventListener("submit", async e=>{
+  e.preventDefault(); const button=form.querySelector('button[type="submit"]'), oldText=button.textContent;
+  button.disabled=true;button.textContent="Сохраняем…";
+  try { await apiPost(Object.assign({action},map(formData(form)))); form.reset(); await loadData(); }
+  catch(err){alert("Не удалось сохранить: "+err.message);}
+  finally{button.disabled=false;button.textContent=oldText;}
+ });
 }
-
-function bindForms() {
-  document.getElementById("f-materials").onsubmit = e => {
-    e.preventDefault();
-    const d = formData(e.target);
-    const item = { id: nextId(store.materials), title: d.title, url: d.url, description: d.description };
-    if (d.grade) item.grade = +d.grade;
-    store.materials.push(item);
-    persist("materials"); e.target.reset(); renderLists();
-  };
-
-  document.getElementById("f-homework").onsubmit = e => {
-    e.preventDefault();
-    const d = formData(e.target);
-    store.homework.push({ id: nextId(store.homework), student: d.student, title: d.title, assigned: d.assigned, due: d.due, status: "pending" });
-    persist("homework"); e.target.reset(); renderLists();
-  };
-
-  document.getElementById("f-schedule").onsubmit = e => {
-    e.preventDefault();
-    const d = formData(e.target);
-    const item = { date: d.date, time: d.time, type: d.type, title: d.title };
-    if (d.student) item.student = d.student;
-    store.schedule.push(item);
-    store.schedule.sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
-    persist("schedule"); e.target.reset(); renderLists();
-  };
-
-  document.getElementById("f-users").onsubmit = async e => {
-    e.preventDefault();
-    const d = formData(e.target);
-    if (store.users.some(u => u.login.toLowerCase() === d.login.toLowerCase())) { alert("Такой логин уже есть."); return; }
-    const user = { login: d.login, name: d.name, role: "student", grade: +d.grade };
-    if (d.hash) user.passwordHash = await sha256(d.password); else user.password = d.password;
-    // порядок полей: login, password/passwordHash, name, ...
-    store.users.push(user);
-    persist("users"); e.target.reset(); fillStudentSelects(); renderLists();
-  };
-
-  document.querySelectorAll("[data-download]").forEach(b => b.onclick = () => download(b.dataset.download));
-}
-
-/* ---------- GitHub API ---------- */
-function bindGithub() {
-  const repo = document.getElementById("ghRepo"), branch = document.getElementById("ghBranch"), token = document.getElementById("ghToken");
-  const status = document.getElementById("ghStatus");
-  repo.value = localStorage.getItem("tutor_gh_repo") || "";
-  branch.value = localStorage.getItem("tutor_gh_branch") || "main";
-  token.value = localStorage.getItem("tutor_gh_token") || "";
-
-  document.getElementById("ghSave").onclick = () => {
-    localStorage.setItem("tutor_gh_repo", repo.value.trim());
-    localStorage.setItem("tutor_gh_branch", branch.value.trim());
-    localStorage.setItem("tutor_gh_token", token.value.trim());
-    status.textContent = "Настройки сохранены в этом браузере.";
-  };
-
-  document.getElementById("ghPush").onclick = async () => {
-    if (!repo.value || !token.value) { status.textContent = "Укажите репозиторий и токен."; return; }
-    if (!confirm("Перезаписать data/*.json в репозитории текущим содержимым?")) return;
-    status.textContent = "Отправляю…";
-    try {
-      for (const name of FILES) {
-        const url = `https://api.github.com/repos/${repo.value.trim()}/contents/data/${name}.json`;
-        const headers = { Authorization: "Bearer " + token.value.trim(), Accept: "application/vnd.github+json" };
-        const cur = await fetch(url + "?ref=" + encodeURIComponent(branch.value), { headers });
-        const sha = cur.ok ? (await cur.json()).sha : undefined;
-        const text = JSON.stringify(store[name], null, 2) + "\n";
-        const content = btoa(String.fromCharCode(...new TextEncoder().encode(text)));
-        const res = await fetch(url, {
-          method: "PUT", headers,
-          body: JSON.stringify({ message: `Обновление ${name}.json из панели репетитора`, content, sha, branch: branch.value.trim() })
-        });
-        if (!res.ok) throw new Error(`${name}.json: ${res.status} ${(await res.json()).message || ""}`);
-      }
-      status.textContent = "Готово! Страницы обновятся через минуту-две.";
-    } catch (e) {
-      status.textContent = "Ошибка: " + e.message;
-    }
-  };
-}
-
-(async function init() {
-  if (!session) return;
-  document.getElementById("logoutBtn").onclick = logout;
-
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b === btn));
-      document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === btn.dataset.tab));
-    };
-  });
-
-  try {
-    for (const name of FILES) {
-      const draft = localStorage.getItem(draftKey(name));
-      store[name] = draft ? JSON.parse(draft) : await loadJSON(`data/${name}.json`);
-    }
-  } catch (e) {
-    alert(e.message);
-    return;
-  }
-  fillStudentSelects();
-  bindForms();
-  bindGithub();
-  renderLists();
-})();
+submitForm(document.getElementById("f-materials"),"addMaterial",d=>({title:d.title,grade:d.grade,url:d.url,description:d.description}));
+submitForm(document.getElementById("f-homework"),"addHomework",d=>({student:d.student,title:d.title,assigned:d.assigned,due:d.due}));
+submitForm(document.getElementById("f-schedule"),"addEvent",d=>({date:d.date,time:d.time,type:d.type,title:d.title,description:d.description,student:d.student}));
+loadData();

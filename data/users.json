@@ -1,6 +1,0 @@
-[
-  { "login": "teacher", "password": "admin", "name": "Мария Ивановна", "role": "admin" },
-  { "login": "ivan", "password": "1234", "name": "Иван Петров", "role": "student", "grade": 9 },
-  { "login": "anna", "passwordHash": "46de52c3669fadab0275e82285413e9f2a79cb549a0400e19be9758bf7b2ffb4", "name": "Анна Смирнова", "role": "student", "grade": 8 },
-  { "login": "oleg", "password": "oleg11", "name": "Олег Кузнецов", "role": "student", "grade": 11 }
-]
