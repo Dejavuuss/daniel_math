@@ -1,13 +1,10 @@
 // URL веб-приложения Apps Script. Замените на URL своего деплоя /exec.
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOvcisK9g839meTFgnPHWVHqBg3SWikr_tlqyulHwznZXWfFgs3xsVyLaAWsQ2mOFZ/exec";
-Замените значение APPS_SCRIPT_URL на новый URL из шага выше.";
 const USER_KEY = "tutor_user";
-
 function getCurrentUser() {
   try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (_) { return null; }
 }
 function saveCurrentUser(user, token) {
-  // Пароль не сохраняется. Токен выдан GAS и используется для проверки POST-запросов.
   localStorage.setItem(USER_KEY, JSON.stringify({ username:user.username, name:user.name, role:user.role, grade:user.grade, token:token }));
 }
 function logout() { localStorage.removeItem(USER_KEY); location.href = "index.html"; }
@@ -30,7 +27,6 @@ async function apiPost(payload) {
   const user = getCurrentUser();
   const body = Object.assign({}, payload);
   if (payload.action !== "login" && user) { body.username = user.username; body.token = user.token; }
-  // text/plain не вызывает CORS preflight для Apps Script Web App.
   const res = await fetch(APPS_SCRIPT_URL, {
     method:"POST",
     headers:{"Content-Type":"text/plain;charset=utf-8"},
