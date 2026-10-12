@@ -1,5 +1,6 @@
 // URL веб-приложения Apps Script. Замените на URL своего деплоя /exec.
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOvcisK9g839meTFgnPHWVHqBg3SWikr_tlqyulHwznZXWfFgs3xsVyLaAWsQ2mOFZ/exec";
+Замените значение APPS_SCRIPT_URL на новый URL из шага выше.";
 const USER_KEY = "tutor_user";
 
 function getCurrentUser() {
