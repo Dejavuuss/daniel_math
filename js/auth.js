@@ -1,5 +1,5 @@
-// URL веб-приложения Apps Script. Замените на URL своего деплоя /exec.
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSqfChUd8r7cgdoUtD1wrHPatDxcKACGSrS2Zi1HjCaAVJ8Gd2jsKK9Aioa9jh4-Fi/exec";
+// URL веб-приложения Apps Script.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOvcisK9g839meTFgnPHWVHqBg3SWikr_tlqyulHwznZXWfFgs3xsVyLaAWsQ2mOFZ/exec";
 const USER_KEY = "tutor_user";
 function getCurrentUser() {
   try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (_) { return null; }
