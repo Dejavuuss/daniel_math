@@ -1,13 +1,166 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Панель репетитора</title><link rel="stylesheet" href="css/style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"></head>
-<body><header class="topbar"><div class="container"><div><div class="eyebrow">УПРАВЛЕНИЕ</div><h1>Панель репетитора</h1></div><div class="actions"><a class="btn" href="dashboard.html">Кабинет</a><button id="themeBtn">◐</button><button id="logoutBtn">Выйти ↗</button></div></div></header>
-<main class="container"><div class="notice"><span class="eyebrow">LIVE / GOOGLE SHEETS</span><strong> Данные синхронизируются напрямую</strong><p class="muted small">После сохранения ученики и родители увидят изменения при обновлении кабинета.</p><aside class="quote">«Нельзя научить человека чему-либо; можно лишь помочь ему открыть это в себе». <span>— Галилео Галилей</span></aside></div><div class="stats-grid"><article class="stat-card"><span class="eyebrow">УЧЕНИКИ</span><strong id="statStudents">—</strong><span class="muted small">активные аккаунты</span></article><article class="stat-card"><span class="eyebrow">ЗАДАНИЯ</span><strong id="statHomework">—</strong><span class="muted small">всего выдано</span></article><article class="stat-card"><span class="eyebrow">МАТЕРИАЛЫ</span><strong id="statMaterials">—</strong><span class="muted small">в библиотеке</span></article></div><p id="adminStatus" class="muted small status-line">Загружаем данные…</p>
-<nav class="tabs"><button class="tab active" data-tab="t-materials">📚 Материалы</button><button class="tab" data-tab="t-homework">📝 Домашние задания</button><button class="tab" data-tab="t-schedule">📅 Календарь</button><button class="tab" data-tab="t-grades">Оценки</button><button class="tab" data-tab="t-parents">Родители</button></nav>
-<section id="t-materials" class="tab-panel active card"><h2>Добавить материал</h2><form id="f-materials"><div class="grid2"><div><label>Название</label><input name="title" required></div><div><label>Класс (пусто — всем)</label><input name="grade" type="number" min="1" max="11"></div></div><label>Ссылка</label><input name="url" type="url" placeholder="https://… или files/example.pdf"><label>Описание</label><input name="description"><button class="primary" type="submit">Сохранить материал</button></form><h2 class="list-title">Материалы в базе</h2><div id="l-materials"></div></section>
-<section id="t-homework" class="tab-panel card"><div class="section-heading"><h2>Выдать домашнее задание</h2><span class="eyebrow">ЗАДАНИЕ + РЕСУРС</span></div><form id="f-homework"><div class="grid2"><div><label>Ученик</label><select name="student" id="studentSelect" required></select></div><div><label>Задание</label><input name="title" placeholder="Например, квадратные уравнения" required></div><div><label>Дата выдачи</label><input name="assigned" type="date" required></div><div><label>Дедлайн</label><input name="due" type="date" required></div></div><label>Ссылка на объяснение или видео (необязательно)</label><input name="link" type="url" placeholder="https://youtube.com/watch?v=…"><p class="muted small">Можно добавить YouTube, видеоурок, онлайн-тренажёр или документ.</p><button class="primary" type="submit">＋ Выдать задание</button></form><h2 class="list-title">Домашние задания</h2><div id="l-homework"></div></section>
-<section id="t-schedule" class="tab-panel card"><h2>Добавить событие</h2><form id="f-schedule"><div class="grid2"><div><label>Дата (2026)</label><input name="date" type="date" min="2026-01-01" max="2026-12-31" required></div><div><label>Время</label><input name="time" type="time"></div><div><label>Тип события</label><select name="type"><option value="lesson">🔵 Занятие</option><option value="deadline">🟠 Дедлайн ДЗ</option><option value="test">🔴 Контрольная</option><option value="olympiad">🟢 Олимпиада</option></select></div><div><label>Для ученика (пусто — всем)</label><select name="student" id="eventStudent"><option value="">Все ученики</option></select></div></div><label>Название</label><input name="title" required><label>Описание</label><textarea name="description" rows="2"></textarea><button class="primary" type="submit">Добавить событие</button></form><h2 class="list-title">События календаря</h2><div id="l-schedule"></div></section>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></head>
+<body class="page-admin"><header class="topbar"><div class="container"><div><div class="eyebrow">УПРАВЛЕНИЕ</div><h1>Панель репетитора</h1></div><div class="actions"><a class="btn" href="dashboard.html">Кабинет</a><button id="themeBtn">◐</button><button id="logoutBtn">Выйти ↗</button></div></div></header>
+<main class="container">
+<div class="notice"><span class="eyebrow">LIVE / GOOGLE SHEETS</span><strong>Данные синхронизируются напрямую</strong><p class="muted small">После сохранения ученики и родители увидят изменения при обновлении.</p>
+<aside class="quote">«Нельзя научить человека чему-либо; можно лишь помочь ему открыть это в себе». <span>— Галилео Галилей</span></aside></div>
 
-<section id="t-grades" class="tab-panel card"><div class="section-heading"><h2>Добавить оценку</h2><span class="eyebrow">ЭЛЕКТРОННЫЙ ДНЕВНИК</span></div><form id="f-grades"><div class="grid2"><div><label>Ученик</label><select name="student" id="gradeStudent" required></select></div><div><label>Предмет</label><select name="subject" required><option>Математика</option><option>Алгебра</option><option>Геометрия</option></select></div><div><label>Оценка (1–5)</label><select name="grade" required><option value="5">5 — отлично</option><option value="4">4 — хорошо</option><option value="3">3 — удовлетворительно</option><option value="2">2 — неудовлетворительно</option><option value="1">1</option></select></div><div><label>Дата</label><input name="date" type="date" required></div></div><label>Комментарий (необязательно)</label><input name="comment" placeholder="Например, самостоятельная работа по квадратным уравнениям"><button class="primary" type="submit">＋ Сохранить оценку</button></form><h2 class="list-title">Журнал оценок</h2><div id="l-grades"></div></section>
-<section id="t-parents" class="tab-panel card"><div class="section-heading"><h2>Добавить родителя</h2><span class="eyebrow">ДОСТУП К КАБИНЕТУ РЕБЁНКА</span></div><p class="muted small">Родитель войдёт под отдельным логином и сможет смотреть расписание, домашние задания и оценки привязанного ученика.</p><form id="f-parents"><div class="grid2"><div><label>Имя родителя</label><input name="name" required></div><div><label>Логин (латиница)</label><input name="username" pattern="[A-Za-z0-9._-]{3,40}" required></div><div><label>Временный пароль (от 6 символов)</label><input name="password" type="password" minlength="6" required></div><div><label>Ученик</label><select name="child" id="parentChild" required></select></div></div><button class="primary" type="submit">＋ Создать аккаунт родителя</button></form><h2 class="list-title">Аккаунты родителей</h2><div id="l-parents"></div></section>
-</main><script src="js/auth.js"></script><script src="js/admin.js"></script></body></html>
+<div class="stats-grid">
+    <article class="stat-card"><span class="eyebrow">УЧЕНИКИ</span><strong id="statStudents">—</strong><span class="muted small">активные</span></article>
+    <article class="stat-card"><span class="eyebrow">ЗАДАНИЯ</span><strong id="statHomework">—</strong><span class="muted small">выдано</span></article>
+    <article class="stat-card"><span class="eyebrow">МАТЕРИАЛЫ</span><strong id="statMaterials">—</strong><span class="muted small">в базе</span></article>
+    <article class="stat-card"><span class="eyebrow">ЗАНЯТИЙ</span><strong id="statLessons">—</strong><span class="muted small">проведено</span></article>
+</div>
+
+<p id="adminStatus" class="muted small status-line">Загружаем данные…</p>
+
+<nav class="tabs">
+    <button class="tab active" data-tab="t-materials">📚 Материалы</button>
+    <button class="tab" data-tab="t-homework">📝 ДЗ</button>
+    <button class="tab" data-tab="t-schedule">📅 Календарь</button>
+    <button class="tab" data-tab="t-grades">Оценки</button>
+    <button class="tab" data-tab="t-notes">🗒 Заметки</button>
+    <button class="tab" data-tab="t-payments">💰 Платежи</button>
+    <button class="tab" data-tab="t-achievements">🏆 Достижения</button>
+    <button class="tab" data-tab="t-messages">💬 Сообщения</button>
+    <button class="tab" data-tab="t-parents">Родители</button>
+</nav>
+
+<section id="t-materials" class="tab-panel active card">
+<h2>Добавить материал</h2>
+<form id="f-materials">
+    <div class="grid2">
+        <div><label>Название</label><input name="title" required></div>
+        <div><label>Класс (пусто — всем)</label><input name="grade" type="number" min="1" max="11"></div>
+        <div><label>Тема</label><input name="topic" placeholder="Например, уравнения"></div>
+        <div><label>Тип</label><select name="type"><option value="material">Материал</option><option value="video">Видео</option><option value="test">Тест</option><option value="worksheet">Рабочий лист</option></select></div>
+    </div>
+    <label>Ссылка</label><input name="url" type="url" placeholder="https://…">
+    <label>Описание</label><textarea name="description" rows="2"></textarea>
+    <button class="primary" type="submit">Сохранить материал</button>
+</form>
+<h2 class="list-title">Материалы в базе</h2><div id="l-materials"></div>
+</section>
+
+<section id="t-homework" class="tab-panel card">
+<h2>Выдать домашнее задание</h2>
+<form id="f-homework">
+    <div class="grid2">
+        <div><label>Ученик</label><select name="student" id="studentSelect" required></select></div>
+        <div><label>Задание</label><input name="title" required></div>
+        <div><label>Дата выдачи</label><input name="assigned" type="date" required></div>
+        <div><label>Дедлайн</label><input name="due" type="date" required></div>
+    </div>
+    <label>Ссылка на объяснение</label><input name="link" type="url" placeholder="https://youtube.com/watch?v=…">
+    <label>Комментарий</label><textarea name="comment" rows="2"></textarea>
+    <button class="primary" type="submit">＋ Выдать задание</button>
+</form>
+<h2 class="list-title">Домашние задания</h2><div id="l-homework"></div>
+</section>
+
+<section id="t-schedule" class="tab-panel card">
+<h2>Добавить событие</h2>
+<form id="f-schedule">
+    <div class="grid2">
+        <div><label>Дата</label><input name="date" type="date" required></div>
+        <div><label>Время</label><input name="time" type="time"></div>
+        <div><label>Тип</label><select name="type"><option value="lesson">🔵 Занятие</option><option value="deadline">🟠 Дедлайн ДЗ</option><option value="test">🔴 Контрольная</option><option value="olympiad">🟢 Олимпиада</option></select></div>
+        <div><label>Для ученика</label><select name="student" id="eventStudent"><option value="">Все</option></select></div>
+    </div>
+    <label>Название</label><input name="title" required>
+    <label>Описание</label><textarea name="description" rows="2"></textarea>
+    <button class="primary" type="submit">Добавить событие</button>
+</form>
+<h2 class="list-title">События календаря</h2><div id="l-schedule"></div>
+</section>
+
+<section id="t-grades" class="tab-panel card">
+<h2>Добавить оценку</h2>
+<form id="f-grades">
+    <div class="grid2">
+        <div><label>Ученик</label><select name="student" id="gradeStudent" required></select></div>
+        <div><label>Предмет</label><select name="subject" required><option>Математика</option><option>Алгебра</option><option>Геометрия</option></select></div>
+        <div><label>Оценка (1–5)</label><select name="grade" required><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></div>
+        <div><label>Дата</label><input name="date" type="date" required></div>
+    </div>
+    <label>Комментарий</label><input name="comment" placeholder="Например, кв. уравнения">
+    <button class="primary" type="submit">＋ Сохранить оценку</button>
+</form>
+<h2 class="list-title">Журнал оценок</h2><div id="l-grades"></div>
+</section>
+
+<section id="t-notes" class="tab-panel card">
+<h2>🗒 Заметка с занятия</h2>
+<p class="muted small">Что прошли, как ученик справился, что повторить.</p>
+<form id="f-notes">
+    <div class="grid2">
+        <div><label>Ученик</label><select name="student" id="noteStudent" required></select></div>
+        <div><label>Дата</label><input name="date" type="date" required></div>
+        <div><label>Тема занятия</label><input name="topic" required></div>
+        <div><label>Длительность (мин)</label><input name="duration" type="number" value="60"></div>
+        <div><label>Усвоение (1–5)</label><select name="rating"><option value="5">Отлично</option><option value="4">Хорошо</option><option value="3">Средне</option><option value="2">Плохо</option><option value="1">Не понял</option></select></div>
+    </div>
+    <label>Заметка</label><textarea name="note" rows="4" placeholder="Прошли квадратные уравнения. Хорошо решает через дискриминант, путается с теоремой Виета…"></textarea>
+    <button class="primary" type="submit">＋ Сохранить заметку</button>
+</form>
+<h2 class="list-title">История занятий</h2><div id="l-notes"></div>
+</section>
+
+<section id="t-payments" class="tab-panel card">
+<h2>💰 Учёт платежей</h2>
+<form id="f-payments">
+    <div class="grid2">
+        <div><label>Ученик</label><select name="student" id="payStudent" required></select></div>
+        <div><label>Дата</label><input name="date" type="date" required></div>
+        <div><label>Сумма (₽)</label><input name="amount" type="number" required></div>
+        <div><label>Тип</label><select name="type"><option value="paid">Оплачено</option><option value="lesson">Проведено занятие</option><option value="refund">Возврат</option></select></div>
+    </div>
+    <label>Описание</label><input name="description" placeholder="4 занятия за октябрь">
+    <button class="primary" type="submit">＋ Добавить запись</button>
+</form>
+<h2 class="list-title">История платежей</h2><div id="l-payments"></div>
+</section>
+
+<section id="t-achievements" class="tab-panel card">
+<h2>🏆 Выдать достижение</h2>
+<form id="f-achievements">
+    <div class="grid2">
+        <div><label>Ученик</label><select name="student" id="achStudent" required></select></div>
+        <div><label>Дата</label><input name="date" type="date" required></div>
+        <div><label>Название</label><input name="title" required placeholder="Первая пятёрка"></div>
+        <div><label>Иконка (эмодзи)</label><input name="icon" value="🏆" maxlength="4"></div>
+    </div>
+    <label>Описание</label><input name="description" placeholder="Решил 10 задач подряд без ошибок">
+    <button class="primary" type="submit">＋ Выдать достижение</button>
+</form>
+<h2 class="list-title">Все достижения</h2><div id="l-achievements"></div>
+</section>
+
+<section id="t-messages" class="tab-panel card">
+<h2>💬 Отправить сообщение</h2>
+<form id="f-messages">
+    <div class="grid2">
+        <div><label>Кому</label><select name="to" id="msgTo" required></select></div>
+    </div>
+    <label>Сообщение</label><textarea name="text" rows="3" required></textarea>
+    <button class="primary" type="submit">Отправить</button>
+</form>
+<h2 class="list-title">Все сообщения</h2><div id="l-messages"></div>
+</section>
+
+<section id="t-parents" class="tab-panel card">
+<h2>Добавить родителя</h2>
+<form id="f-parents">
+    <div class="grid2">
+        <div><label>Имя родителя</label><input name="name" required></div>
+        <div><label>Логин (латиница)</label><input name="username" pattern="[A-Za-z0-9._-]{3,40}" required></div>
+        <div><label>Пароль (от 6)</label><input name="password" type="password" minlength="6" required></div>
+        <div><label>Ученик</label><select name="child" id="parentChild" required></select></div>
+    </div>
+    <button class="primary" type="submit">＋ Создать аккаунт</button>
+</form>
+<h2 class="list-title">Аккаунты родителей</h2><div id="l-parents"></div>
+</section>
+</main>
+<script src="js/auth.js"></script><script src="js/admin.js"></script></body></html>
