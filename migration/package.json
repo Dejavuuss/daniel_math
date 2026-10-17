@@ -1,0 +1,13 @@
+{
+  "name": "math-tutor-migration",
+  "private": true,
+  "type": "module",
+  "description": "Перенос данных из Google Sheets в Firebase",
+  "scripts": {
+    "dry-run": "node import.mjs --export sheets-export.json --key service-account.json --dry-run --short-suffix 2026",
+    "import": "node import.mjs --export sheets-export.json --key service-account.json --short-suffix 2026"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0"
+  }
+}

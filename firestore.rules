@@ -1,0 +1,243 @@
+rules_version = '2';
+
+// ===============================================================
+// Предполагаемая модель данных (источник правды — js/auth.js, ADMIN_RECORDS и dispatch)
+// ===============================================================
+//
+// Вход: Firebase Auth по служебному адресу <логин>@<USERNAME_DOMAIN> (js/firebase-config.js).
+// Логин пользователя = часть адреса до «@». Профиль лежит в users/{логин} и действителен,
+// только если его поле uid совпадает с request.auth.uid — поэтому чужой аккаунт с тем же
+// логином на другом домене ничего не получит.
+//
+// users/{username}          username: string ^[a-z0-9._-]{3,40}$ (= id документа, неизменяем)
+//                           uid: string (неизменяем), name: string 1..100,
+//                           role: 'admin' | 'student' | 'parent' (через приложение — только student/parent),
+//                           grade: int 1..11 | null, child: string (логин ученика у родителя, иначе '')
+// materials/{id}            title 1..200, grade int 1..11 | null, url ''|http(s) ≤1000,
+//                           description ≤2000, topic ≤200, type: material|video|test|worksheet
+// homework/{id}             student, title 1..300, assigned, due (ГГГГ-ММ-ДД), status: pending|done,
+//                           link ''|http(s) ≤1000, comment ≤2000
+// schedule/{id}             date, time ''|ЧЧ:ММ, type: lesson|deadline|test|olympiad, title 1..200,
+//                           description ≤2000, student ('' — событие для всех), status: planned|done|cancelled
+// grades/{id}               student, subject: Математика|Алгебра|Геометрия, grade int 1..5, date, comment ≤500
+// lessonNotes/{id}          date, student, topic 1..200, note ≤5000, rating int 0..5, duration int 1..600
+// payments/{id}             date, student, amount number |x| ≤ 1e7, type: paid|lesson|refund, description ≤500
+// achievements/{id}         student, title 1..120, description ≤500, date, icon ≤16
+// messages/{id}             from, to (логины), text 1..2000, date, isRead: bool
+// topics/{id}               subject, title 1..200, description ≤2000
+//
+// Доступ:
+//   admin   — читает и пишет всё (кроме создания других админов).
+//   student — читает свои записи (поле student == свой логин), общие материалы/темы/события,
+//             меняет только status своих домашних заданий.
+//   parent  — то же, что его ученик (users.child), плюс свои сообщения.
+//   Сообщения: участник переписки — отправитель/получатель или ученик родителя.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Кто спрашивает ----------
+    function signedIn() {
+      return request.auth != null && request.auth.token.email is string;
+    }
+    function myUsername() {
+      return request.auth.token.email.lower().split('@')[0];
+    }
+    function userPath(name) {
+      return /databases/$(database)/documents/users/$(name);
+    }
+    function me() {
+      return get(userPath(myUsername())).data;
+    }
+    function isMember() {
+      return signedIn() && exists(userPath(myUsername())) && me().uid == request.auth.uid;
+    }
+    function isAdmin() {
+      return isMember() && me().role == 'admin';
+    }
+    // s — логин ученика, чьи записи запрашиваются: свой для ученика, ребёнка для родителя.
+    function isMyStudent(s) {
+      return isMember() && s is string && s != '' &&
+        ((me().role == 'student' && s == myUsername()) ||
+         (me().role == 'parent' && s == me().child));
+    }
+    // Участник переписки: я сам или мой ученик.
+    function isMyParty(u) {
+      return isMember() && (u == myUsername() || isMyStudent(u));
+    }
+
+    // ---------- Проверки полей ----------
+    function hasExactly(d, fields) {
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields);
+    }
+    function str(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+    function login(v) {
+      return v is string && v.matches('^[a-z0-9._-]{3,40}$');
+    }
+    function day(v) {
+      return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+    function url(v) {
+      return str(v, 0, 1000) && (v == '' || v.matches('^https?://.+'));
+    }
+    function intIn(v, min, max) {
+      return v is int && v >= min && v <= max;
+    }
+    function optGrade(v) {
+      return v == null || intIn(v, 1, 11);
+    }
+    function subject(v) {
+      return v in ['Математика', 'Алгебра', 'Геометрия'];
+    }
+
+    // ---------- Валидаторы документов (вызываются и в create, и в update) ----------
+    function isValidUser(d, username) {
+      return hasExactly(d, ['username', 'uid', 'name', 'role', 'grade', 'child']) &&
+        login(d.username) && d.username == username &&
+        str(d.uid, 1, 128) && str(d.name, 1, 100) &&
+        d.role in ['admin', 'student', 'parent'] &&
+        optGrade(d.grade) &&
+        ((d.role == 'parent' && login(d.child) &&
+          exists(userPath(d.child)) && get(userPath(d.child)).data.role == 'student') ||
+         (d.role != 'parent' && d.child == ''));
+    }
+    function isValidMaterial(d) {
+      return hasExactly(d, ['title', 'grade', 'url', 'description', 'topic', 'type']) &&
+        str(d.title, 1, 200) && optGrade(d.grade) && url(d.url) &&
+        str(d.description, 0, 2000) && str(d.topic, 0, 200) &&
+        d.type in ['material', 'video', 'test', 'worksheet'];
+    }
+    function isValidHomework(d) {
+      return hasExactly(d, ['student', 'title', 'assigned', 'due', 'status', 'link', 'comment']) &&
+        login(d.student) && str(d.title, 1, 300) && day(d.assigned) && day(d.due) &&
+        d.status in ['pending', 'done'] && url(d.link) && str(d.comment, 0, 2000);
+    }
+    function isValidEvent(d) {
+      return hasExactly(d, ['date', 'time', 'type', 'title', 'description', 'student', 'status']) &&
+        day(d.date) && d.time is string && (d.time == '' || d.time.matches('^[0-9]{2}:[0-9]{2}$')) &&
+        d.type in ['lesson', 'deadline', 'test', 'olympiad'] &&
+        str(d.title, 1, 200) && str(d.description, 0, 2000) &&
+        (d.student == '' || login(d.student)) &&
+        d.status in ['planned', 'done', 'cancelled'];
+    }
+    function isValidGrade(d) {
+      return hasExactly(d, ['student', 'subject', 'grade', 'date', 'comment']) &&
+        login(d.student) && subject(d.subject) && intIn(d.grade, 1, 5) && day(d.date) && str(d.comment, 0, 500);
+    }
+    function isValidNote(d) {
+      return hasExactly(d, ['date', 'student', 'topic', 'note', 'rating', 'duration']) &&
+        day(d.date) && login(d.student) && str(d.topic, 1, 200) && str(d.note, 0, 5000) &&
+        intIn(d.rating, 0, 5) && intIn(d.duration, 1, 600);
+    }
+    function isValidPayment(d) {
+      return hasExactly(d, ['date', 'student', 'amount', 'type', 'description']) &&
+        day(d.date) && login(d.student) && d.amount is number &&
+        d.amount >= -10000000 && d.amount <= 10000000 &&
+        d.type in ['paid', 'lesson', 'refund'] && str(d.description, 0, 500);
+    }
+    function isValidAchievement(d) {
+      return hasExactly(d, ['student', 'title', 'description', 'date', 'icon']) &&
+        login(d.student) && str(d.title, 1, 120) && str(d.description, 0, 500) && day(d.date) && str(d.icon, 0, 16);
+    }
+    function isValidMessage(d) {
+      return hasExactly(d, ['from', 'to', 'text', 'date', 'isRead']) &&
+        login(d.from) && login(d.to) && str(d.text, 1, 2000) && day(d.date) && d.isRead is bool;
+    }
+    function isValidTopic(d) {
+      return hasExactly(d, ['subject', 'title', 'description']) &&
+        subject(d.subject) && str(d.title, 1, 200) && str(d.description, 0, 2000);
+    }
+
+    // Кому можно писать: админ — всем; остальные — репетитору, своему ребёнку или родителю.
+    function canMessage(to) {
+      return exists(userPath(to)) &&
+        (me().role == 'admin' ||
+         get(userPath(to)).data.role == 'admin' ||
+         (me().role == 'parent' && to == me().child) ||
+         get(userPath(to)).data.child == myUsername());
+    }
+
+    // ---------- Коллекции ----------
+    match /users/{username} {
+      allow read: if isAdmin() || (isMember() && username == myUsername()) ||
+        (isMember() && me().role == 'parent' && username == me().child);
+      // Админов создают только из консоли или скриптом миграции (Admin SDK обходит правила).
+      allow create: if isAdmin() && isValidUser(request.resource.data, username) &&
+        request.resource.data.role in ['student', 'parent'];
+      allow update: if isAdmin() && isValidUser(request.resource.data, username) &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin() && username != myUsername();
+    }
+
+    match /materials/{id} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() && isValidMaterial(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /topics/{id} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() && isValidTopic(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /homework/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create: if isAdmin() && isValidHomework(request.resource.data);
+      // Ученик и родитель могут менять только статус своего задания.
+      allow update: if isValidHomework(request.resource.data) &&
+        (isAdmin() ||
+         (isMyStudent(resource.data.student) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+      allow delete: if isAdmin();
+    }
+
+    match /schedule/{id} {
+      allow read: if isAdmin() || (isMember() && resource.data.student == '') || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /grades/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidGrade(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /lessonNotes/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidNote(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidPayment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /achievements/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidAchievement(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /messages/{id} {
+      allow read: if isAdmin() || isMyParty(resource.data.from) || isMyParty(resource.data.to);
+      allow create: if isMember() && isValidMessage(request.resource.data) &&
+        request.resource.data.from == myUsername() &&
+        request.resource.data.isRead == false &&
+        canMessage(request.resource.data.to);
+      // Отметить прочитанным может только получатель (или родитель получателя), и только поле isRead.
+      allow update: if isValidMessage(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) &&
+        request.resource.data.isRead == true &&
+        (isAdmin() || (isMyParty(resource.data.to) && resource.data.from != myUsername()));
+      allow delete: if isAdmin();
+    }
+  }
+}

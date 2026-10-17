@@ -1,53 +1,76 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Кабинет родителя</title><link rel="stylesheet" href="css/style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></head>
-<body class="page-parent"><header class="topbar"><div class="container"><div><div class="eyebrow">СЕМЕЙНЫЙ ДОСТУП</div><h1 id="parentGreeting">Кабинет родителя</h1></div><div class="actions"><button id="themeBtn">◐</button><button id="logoutBtn">Выйти ↗</button></div></div></header>
-<main class="container">
-<section class="dashboard-intro">
-    <div>
-        <div class="eyebrow">УЧЁБА / ПРОГРЕСС / РАСПИСАНИЕ</div>
-        <h2>Всё важное<br><span>о занятиях.</span></h2>
-        <p class="muted">Расписание, выполнение ДЗ, оценки и прогресс ребёнка в одном месте.</p>
-        <aside class="quote">«Природа говорит на языке математики». <span>— Галилео Галилей</span></aside>
+<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кабинет родителя</title>
+<meta name="theme-color" content="#17120f">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"></head>
+<body class="page-parent">
+<header class="topbar"><div class="container">
+    <div class="brand"><div class="seal" aria-hidden="true">π</div><div><h1>Кабинет родителя</h1><span class="brand-sub">Математика с репетитором</span></div></div>
+    <div class="actions">
+        <button id="themeBtn" class="icon-btn" aria-label="Сменить тему"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
+        <button id="logoutBtn">Выйти</button>
     </div>
-    <div class="intro-mark" aria-hidden="true">π</div>
+</div></header>
+
+<main class="container">
+<section class="hall">
+    <div>
+        <p class="hall-label">Зал Хокусая</p>
+        <h2><span class="line"><span id="parentGreeting">Здравствуйте!</span></span><span class="line"><span id="childLine">Всё важное о занятиях.</span></span></h2>
+        <p class="lede">Расписание, выполнение заданий, оценки и заметки репетитора о каждом занятии.</p>
+        <div class="quote" id="quote"></div>
+    </div>
+    <figure class="exhibit" data-reveal="3">
+        <div class="frame" id="art"></div>
+        <figcaption class="placard">
+            <b>Кацусика Хокусай</b>
+            <i>Большая волна в Канагаве</i>
+            <span>Около 1831. Цветная ксилография</span>
+            <p>Гребень волны распадается на «когти», повторяющие форму самой волны, а те — на ещё меньшие. Такое самоподобие математики назовут фракталом только через полтора века. В ложбине волны — крошечная Фудзи.</p>
+        </figcaption>
+    </figure>
 </section>
 
+<p id="parentStatus" class="status-line">Загружаем данные…</p>
 <div id="parentStats" class="stats-grid"></div>
 
 <div class="widgets-grid">
-    <div class="widget">
-        <h3 class="widget-title">📊 Успеваемость</h3>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Успеваемость</h3>
         <div id="parentProgressChart" class="progress-chart"></div>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">🏆 Достижения</h3>
+        <p class="chart-caption">Последние десять оценок</p>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Достижения</h3>
         <div id="parentAchievements" class="achievements-list"></div>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">🗒 Последние занятия</h3>
+    </section>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Последние занятия</h3>
         <div id="parentRecentNotes"></div>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">💬 Сообщения</h3>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Сообщения</h3>
         <div id="parentMessages"></div>
-    </div>
+    </section>
 </div>
 
-<p id="parentStatus" class="muted small status-line">Загружаем данные…</p>
-
-<nav class="tabs">
-    <button class="tab active" data-tab="p-homework">Домашние задания</button>
-    <button class="tab" data-tab="p-grades">Оценки</button>
-    <button class="tab" data-tab="p-notes">Заметки</button>
-    <button class="tab" data-tab="p-schedule">Расписание</button>
-    <button class="tab" data-tab="p-materials">Материалы</button>
+<nav class="tabs" role="tablist" data-reveal>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="p-homework">Домашние задания</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-grades">Оценки</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-notes">Заметки</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-schedule">Расписание</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-materials">Материалы</button>
 </nav>
-
-<section id="p-homework" class="tab-panel active card"><h2>Домашние задания</h2><div id="parentHomework"></div></section>
-<section id="p-grades" class="tab-panel card"><h2>Дневник оценок</h2><div id="parentGrades"></div></section>
-<section id="p-notes" class="tab-panel card"><h2>Заметки с занятий</h2><div id="parentNotes"></div></section>
-<section id="p-schedule" class="tab-panel card"><h2>Расписание и события</h2><div id="parentSchedule"></div></section>
-<section id="p-materials" class="tab-panel card"><h2>Материалы</h2><div id="parentMaterials"></div></section>
+<section id="p-homework" class="tab-panel active card" role="tabpanel"><h2>Домашние задания</h2><div id="parentHomework"></div></section>
+<section id="p-grades" class="tab-panel card" role="tabpanel"><h2>Дневник оценок</h2><div id="parentGrades"></div></section>
+<section id="p-notes" class="tab-panel card" role="tabpanel"><h2>Заметки с занятий</h2><div id="parentNotes"></div></section>
+<section id="p-schedule" class="tab-panel card" role="tabpanel"><h2>Расписание и события</h2><div id="parentSchedule"></div></section>
+<section id="p-materials" class="tab-panel card" role="tabpanel"><h2>Материалы</h2><div id="parentMaterials"></div></section>
 </main>
-<script src="js/auth.js"></script><script src="js/parent.js"></script></body></html>
+<script type="module" src="js/parent.js"></script>
+<script type="module" src="js/assistant.js"></script>
+</body></html>

@@ -1,24 +1,65 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Вход — Математика с репетитором</title><link rel="stylesheet" href="css/style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></head>
-<body class="page-login"><main class="login-wrap"><section class="login-card"><div class="brand-mark">∑</div><h1>Математика с репетитором</h1><p class="muted center">Войдите в личный кабинет</p>
-<form id="loginForm"><label for="loginUsername">Логин</label><input id="loginUsername" autocomplete="username" required>
-<label for="loginPassword">Пароль</label><input id="loginPassword" type="password" autocomplete="current-password" required>
-<button class="primary" type="submit" id="loginBtn">Войти →</button><p id="loginError" class="error" role="alert"></p></form>
-<p class="muted small">Данные синхронизируются с Google Sheets в реальном времени.</p>
-<aside class="quote">«Математика — царица наук». <span>— Карл Фридрих Гаусс</span></aside>
-</section></main>
-<script src="js/auth.js"></script><script>
-if (getCurrentUser()) location.replace(getCurrentUser().role === 'admin' ? 'admin.html' : getCurrentUser().role === 'parent' ? 'parent.html' : 'dashboard.html');
-document.getElementById('loginForm').addEventListener('submit', async e => {
-    e.preventDefault(); const btn=document.getElementById('loginBtn'), err=document.getElementById('loginError');
-    btn.disabled=true; btn.textContent='Входим…'; err.textContent='';
+<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Вход — Математика с репетитором</title>
+<meta name="theme-color" content="#17120f">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"></head>
+<body class="page-login">
+<main class="login-wrap">
+    <figure class="exhibit" data-reveal="3">
+        <div class="frame" id="art"></div>
+        <figcaption class="placard">
+            <b>Леонардо да Винчи</b>
+            <i>Витрувианский человек</i>
+            <span>Около 1490. Перо, тушь. Галерея Академии, Венеция</span>
+            <p>Размах рук человека равен его росту — поэтому фигура вписана в квадрат. Поднятые руки и расставленные ноги касаются круга с центром в пупке. Леонардо проверял пропорции Витрувия циркулем и линейкой.</p>
+        </figcaption>
+    </figure>
+
+    <section class="login-card">
+        <div class="seal" aria-hidden="true">Σ</div>
+        <h1>Математика с&nbsp;репетитором</h1>
+        <p class="lede">Задания, оценки и расписание занятий — для ученика, родителя и репетитора.</p>
+        <form id="loginForm">
+            <label for="loginUsername">Логин</label>
+            <input id="loginUsername" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            <label for="loginPassword">Пароль</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" required>
+            <button class="primary" type="submit" id="loginBtn">Войти</button>
+            <p id="loginError" class="error" role="alert"></p>
+            <p id="demoHint" class="form-hint" hidden>Демо-режим: войдите как teacher, ivan или parent_ivan с любым паролем.</p>
+        </form>
+        <div class="quote" id="quote"></div>
+    </section>
+</main>
+<script type="module">
+import { login, getCurrentUser, homeFor, DEMO } from "./js/auth.js";
+import { initPage, rotateQuotes, leave } from "./js/fx.js";
+import { mountArt, QUOTES } from "./js/art.js";
+
+const current = getCurrentUser();
+if (current) location.replace(homeFor(current.role));
+
+initPage();
+mountArt(document.getElementById("art"), "vitruvian");
+rotateQuotes(document.getElementById("quote"), QUOTES.login);
+document.getElementById("demoHint").hidden = !DEMO;
+
+document.getElementById("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = document.getElementById("loginBtn"), err = document.getElementById("loginError");
+    btn.disabled = true; btn.textContent = "Входим…"; err.textContent = "";
     try {
-        const data=await apiPost({action:'login',username:document.getElementById('loginUsername').value.trim(),password:document.getElementById('loginPassword').value});
-        if(!data.ok) throw new Error(data.error||'Не удалось войти');
-        saveCurrentUser(data.user,data.token);
-        location.href=data.user.role==='admin'?'admin.html':data.user.role==='parent'?'parent.html':'dashboard.html';
-    } catch(ex) { err.textContent=ex.message; } finally {btn.disabled=false;btn.textContent='Войти →';}
+        const user = await login(document.getElementById("loginUsername").value, document.getElementById("loginPassword").value);
+        leave(homeFor(user.role));
+    } catch (ex) {
+        err.textContent = ex.message;
+        btn.disabled = false; btn.textContent = "Войти";
+    }
 });
-</script></body></html>
+</script>
+<script type="module" src="js/assistant.js"></script>
+</body></html>

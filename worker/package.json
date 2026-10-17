@@ -1,0 +1,13 @@
+{
+  "name": "math-assistant-worker",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: ассистент сайта (прокси к OpenRouter)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.147.0"
+  }
+}

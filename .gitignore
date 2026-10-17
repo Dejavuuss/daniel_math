@@ -1,0 +1,15 @@
+# Зависимости скриптов миграции и тестов
+node_modules/
+
+# Секреты и выгрузки с паролями — никогда не коммитить
+service-account*.json
+*-service-account*.json
+sheets-export*.json
+
+# Firebase CLI
+.firebase/
+*-debug.log
+
+# Cloudflare Worker: локальные секреты и кэш wrangler
+worker/.dev.vars
+worker/.wrangler/
