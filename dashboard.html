@@ -1,64 +1,86 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Кабинет ученика</title><link rel="stylesheet" href="css/style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></head>
-<body class="page-dashboard"><header class="topbar"><div class="container"><div><div class="eyebrow">ЛИЧНЫЙ КАБИНЕТ</div><h1 id="greeting">Привет!</h1></div><div class="actions"><a id="adminLink" class="btn" href="admin.html" hidden>Панель</a><button id="themeBtn">◐</button><button id="logoutBtn">Выйти ↗</button></div></div></header>
-<main class="container">
-<section class="dashboard-intro">
-    <div>
-        <div class="eyebrow">ТВОЯ УЧЕБНАЯ СИСТЕМА / 2026</div>
-        <h2>Меньше хаоса.<br><span>Больше понимания.</span></h2>
-        <p class="muted">Материалы, задания, оценки и прогресс — в одном месте.</p>
-        <aside class="quote">«В математике нет символов для неясных мыслей». <span>— Анри Пуанкаре</span></aside>
+<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кабинет ученика</title>
+<meta name="theme-color" content="#17120f">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"></head>
+<body class="page-dashboard">
+<header class="topbar"><div class="container">
+    <div class="brand"><div class="seal" aria-hidden="true">Σ</div><div><h1>Кабинет ученика</h1><span class="brand-sub">Математика с репетитором</span></div></div>
+    <div class="actions">
+        <a id="adminLink" class="btn" href="admin.html" hidden>Панель</a>
+        <button id="themeBtn" class="icon-btn" aria-label="Сменить тему"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
+        <button id="logoutBtn">Выйти</button>
     </div>
-    <div class="intro-mark" aria-hidden="true">∑</div>
+</div></header>
+
+<main class="container">
+<section class="hall">
+    <div>
+        <p class="hall-label">Зал Дюрера</p>
+        <h2><span class="line"><span id="greeting">Привет!</span></span><span class="line"><span>Разберёмся шаг за шагом.</span></span></h2>
+        <p class="lede">Материалы, задания, оценки и заметки с занятий — в одном месте.</p>
+        <div class="quote" id="quote"></div>
+    </div>
+    <figure class="exhibit" data-reveal="3">
+        <div class="frame" id="art"></div>
+        <figcaption class="placard">
+            <b>Альбрехт Дюрер</b>
+            <i>Меланхолия I</i>
+            <span>1514. Гравюра на меди</span>
+            <p>В углу гравюры — магический квадрат: суммы в каждой строке, столбце и на диагоналях равны 34. В середине нижнего ряда Дюрер спрятал год работы — 15 и 14. Наведите на клетку, чтобы сложить её строку. За квадратом вращается многогранник с той же гравюры.</p>
+        </figcaption>
+    </figure>
 </section>
 
+<p id="loadStatus" class="status-line">Загружаем данные…</p>
 <div id="dashboardStats" class="stats-grid"></div>
 
 <div class="widgets-grid">
-    <div class="widget">
-        <h3 class="widget-title">📊 Успеваемость</h3>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Успеваемость</h3>
         <div id="progressChart" class="progress-chart"></div>
-        <p class="muted small" style="margin-top:8px;text-align:center">Последние оценки</p>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">🏆 Достижения</h3>
+        <p class="chart-caption">Последние десять оценок</p>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Достижения</h3>
         <div id="achievementsList" class="achievements-list"></div>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">🔔 Ближайшие дедлайны</h3>
+    </section>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Ближайшие дедлайны</h3>
         <div id="deadlinesList"></div>
-    </div>
-    <div class="widget">
-        <h3 class="widget-title">💬 Сообщения <span id="unreadBadge" class="badge info" style="display:none">0</span></h3>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Сообщения <span id="unreadBadge" class="badge info" hidden>0</span></h3>
         <div id="messagesList"></div>
-    </div>
+    </section>
 </div>
 
-<p id="loadStatus" class="muted small status-line">Загружаем данные…</p>
-
-<nav class="tabs">
-    <button class="tab active" data-tab="t-materials">📚 Материалы</button>
-    <button class="tab" data-tab="t-homework">📝 ДЗ</button>
-    <button class="tab" data-tab="t-notes">🗒 Заметки</button>
-    <button class="tab" data-tab="t-calendar">📅 Календарь</button>
+<nav class="tabs" role="tablist" data-reveal>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="t-materials">Материалы</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-homework">Домашние задания</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-notes">Заметки</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-calendar">Календарь</button>
 </nav>
-
-<section id="t-materials" class="tab-panel active card">
-    <div class="section-heading"><h2>Материалы</h2><span class="eyebrow">ПО ТВОЕМУ КЛАССУ</span></div>
+<section id="t-materials" class="tab-panel active card" role="tabpanel">
+    <div class="section-heading"><h2>Материалы</h2><span class="hint">по твоему классу</span></div>
     <div id="materials"></div>
 </section>
-<section id="t-homework" class="tab-panel card">
-    <div class="section-heading"><h2>Домашние задания</h2><span class="eyebrow">ТВОЙ ПРОГРЕСС</span></div>
+<section id="t-homework" class="tab-panel card" role="tabpanel">
+    <div class="section-heading"><h2>Домашние задания</h2><span class="hint">отмечай, что сделано</span></div>
     <div id="homework"></div>
 </section>
-<section id="t-notes" class="tab-panel card">
-    <div class="section-heading"><h2>Заметки с занятий</h2><span class="eyebrow">ИТОГИ УРОКОВ</span></div>
+<section id="t-notes" class="tab-panel card" role="tabpanel">
+    <div class="section-heading"><h2>Заметки с занятий</h2><span class="hint">что прошли и что повторить</span></div>
     <div id="lessonNotes"></div>
 </section>
-<section id="t-calendar" class="tab-panel card">
-    <div class="section-heading"><h2>Календарь 2026</h2><span class="eyebrow">РАСПИСАНИЕ</span></div>
+<section id="t-calendar" class="tab-panel card" role="tabpanel">
     <div id="calendar"></div>
 </section>
 </main>
-<script src="js/auth.js"></script><script src="js/calendar.js"></script><script src="js/dashboard.js"></script></body></html>
+<script type="module" src="js/dashboard.js"></script>
+<script type="module" src="js/assistant.js"></script>
+</body></html>

@@ -1,0 +1,15 @@
+# Cloudflare Worker ассистента «Смотритель». Деплой: npx wrangler deploy (из папки worker).
+name = "math-assistant"
+main = "src/index.js"
+compatibility_date = "2026-09-25"
+
+# tutor-info.md подключается в код как текст
+rules = [{ type = "Text", globs = ["**/*.md"], fallthrough = true }]
+
+# Счётчики лимитов (KV-хранилище LIMITS в аккаунте Cloudflare)
+[[kv_namespaces]]
+binding = "LIMITS"
+id = "422e3b2c22934ad0b83a01197411e5c9"
+
+[observability]
+enabled = true

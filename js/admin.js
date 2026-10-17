@@ -1,106 +1,118 @@
+import { requireAuth, apiGet, apiPost, logout, today, DEMO } from "./auth.js";
+import { initPage, countUp, rotateQuotes } from "./fx.js";
+import { mountArt, QUOTES } from "./art.js";
+import { esc, byDate, showToast, setStatus, initTabs, noteHtml, messageHtml } from "./ui.js";
+
 const adminUser = requireAuth("admin");
-let state = {users:[],materials:[],homework:[],schedule:[],grades:[],lessonNotes:[],payments:[],achievements:[],messages:[],topics:[],settings:{}};
-const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+let state = null;
 
+initPage();
+initTabs();
+mountArt(document.getElementById("art"), "athens");
+rotateQuotes(document.getElementById("quote"), QUOTES.admin);
 document.getElementById("logoutBtn").onclick = logout;
-document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b===btn));
-    document.querySelectorAll(".tab-panel").forEach(p=>p.classList.toggle("active",p.id===btn.dataset.tab));
-}));
+if (adminUser) document.getElementById("adminGreeting").textContent = greeting() + ", " + adminUser.name.split(" ")[0] + "!";
+// Даты в формах по умолчанию — сегодня.
+document.querySelectorAll('input[type="date"]').forEach(i => { i.value = today(); i.defaultValue = today(); });
 
-function showToast(msg, isError=false) {
-    const t = document.createElement('div');
-    t.className = 'toast' + (isError ? ' error' : '');
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
+function greeting() {
+    const h = new Date().getHours();
+    return h < 5 ? "Доброй ночи" : h < 12 ? "Доброе утро" : h < 18 ? "Добрый день" : "Добрый вечер";
 }
 
 async function loadData() {
-    const status=document.getElementById("adminStatus");
-    status.textContent="Загружаем данные…";
+    const status = document.getElementById("adminStatus");
+    setStatus(status, "Загружаем данные…");
     try {
         state = await apiGet();
         fillStudents();
         renderLists();
-        document.getElementById("statStudents").textContent = state.users.filter(u=>u.role==="student").length;
-        document.getElementById("statHomework").textContent = state.homework.length;
-        document.getElementById("statMaterials").textContent = state.materials.length;
-        document.getElementById("statLessons").textContent = state.lessonNotes.length;
-        status.textContent="● Синхронизировано с Google Sheets";
-    } catch(e) { status.textContent="Ошибка: "+e.message; }
+        countUp(document.getElementById("statStudents"), state.users.filter(u => u.role === "student").length);
+        countUp(document.getElementById("statHomework"), state.homework.length);
+        countUp(document.getElementById("statMaterials"), state.materials.length);
+        countUp(document.getElementById("statLessons"), state.lessonNotes.length);
+        setStatus(status, DEMO ? "Демо-данные загружены" : "Синхронизировано с Firebase", "ok");
+    } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }
 }
 
 function fillStudents() {
-    const opts = state.users.filter(u=>u.role==="student").map(u=>`<option value="${esc(u.username)}">${esc(u.name)} (${esc(u.username)})</option>`).join("");
+    const opts = state.users.filter(u => u.role === "student").map(u => `<option value="${esc(u.username)}">${esc(u.name)} (${esc(u.username)})</option>`).join("");
     ["studentSelect","eventStudent","gradeStudent","parentChild","noteStudent","payStudent","achStudent"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = (id === "eventStudent" ? '<option value="">Все ученики</option>' : '') + opts;
+        if (!el) return;
+        const keep = el.value;
+        el.innerHTML = (id === "eventStudent" ? '<option value="">Все ученики</option>' : "") + opts;
+        if (keep) el.value = keep;
     });
-    const allUsers = state.users.filter(u=>u.role!=="admin").map(u=>`<option value="${esc(u.username)}">${esc(u.name)}</option>`).join("");
-    const msgTo = document.getElementById("msgTo");
-    if (msgTo) msgTo.innerHTML = allUsers;
+    document.getElementById("msgTo").innerHTML = state.users.filter(u => u.role !== "admin")
+        .map(u => `<option value="${esc(u.username)}">${esc(u.name)} — ${u.role === "parent" ? "родитель" : "ученик"}</option>`).join("");
 }
 
-function table(rows, fields, sheet) {
-    if(!rows.length) return '<p class="muted">Записей пока нет.</p>';
-    return `<div class="table-wrap"><table><thead><tr>${fields.map(f=>`<th>${f[1]}</th>`).join("")}<th>Действие</th></tr></thead><tbody>${rows.map(r=>`<tr>${fields.map(f=>`<td>${f[0]==="link" && r[f[0]] ? `<a href="${esc(r[f[0]])}" target="_blank" rel="noopener noreferrer">↗</a>` : esc(r[f[0]])}</td>`).join("")}<td>${sheet === "users" ? "—" : `<button class="danger" data-delete-sheet="${sheet}" data-delete-id="${esc(r.id)}">Удалить</button>`}</td></tr>`).join("")}</tbody></table></div>`;
-}
+const nameOf = u => (state.users.find(x => x.username === u) || {}).name || u;
 
-function ratingStars(n) {
-    return '★'.repeat(Math.max(0,Math.min(5,n||0))) + '☆'.repeat(5 - Math.max(0,Math.min(5,n||0)));
+function table(rows, fields, collection) {
+    if (!rows.length) return '<p class="muted">Записей пока нет.</p>';
+    const cell = (r, f) => f === "url" || f === "link"
+        ? (r[f] ? `<a href="${esc(r[f])}" target="_blank" rel="noopener noreferrer">открыть</a>` : "")
+        : f === "student" || f === "child" ? esc(nameOf(r[f])) : esc(r[f]);
+    return `<div class="table-wrap"><table><thead><tr>${fields.map(f => `<th>${f[1]}</th>`).join("")}${collection ? "<th></th>" : ""}</tr></thead><tbody>${rows.map(r => `<tr>${fields.map(f => `<td>${cell(r, f[0])}</td>`).join("")}${collection ? `<td><button class="danger" data-delete-sheet="${collection}" data-delete-id="${esc(r.id)}">Удалить</button></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
 function renderLists() {
-    document.getElementById("l-materials").innerHTML = table(state.materials,[["title","Название"],["grade","Класс"],["topic","Тема"],["url","Ссылка"]],"materials");
-    document.getElementById("l-homework").innerHTML = table(state.homework,[["student","Ученик"],["title","Задание"],["assigned","Выдано"],["due","Дедлайн"],["status","Статус"],["link","Ссылка"]],"homework");
-    document.getElementById("l-schedule").innerHTML = table(state.schedule,[["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"]],"schedule");
-    document.getElementById("l-grades").innerHTML = table(state.grades||[],[["student","Ученик"],["subject","Предмет"],["grade","Оценка"],["date","Дата"],["comment","Комментарий"]],"grades");
-    document.getElementById("l-parents").innerHTML = table((state.users||[]).filter(u=>u.role==="parent"),[["name","Родитель"],["username","Логин"],["child","Ученик"]],"users");
+    const recent = list => list.slice().sort(byDate).reverse();
+    document.getElementById("l-materials").innerHTML = table(state.materials, [["title","Название"],["grade","Класс"],["topic","Тема"],["url","Ссылка"]], "materials");
+    document.getElementById("l-homework").innerHTML = table(state.homework.slice().sort((a, b) => String(b.due).localeCompare(String(a.due))), [["student","Ученик"],["title","Задание"],["assigned","Выдано"],["due","Сдать до"],["status","Статус"],["link","Ссылка"]], "homework");
+    document.getElementById("l-schedule").innerHTML = table(recent(state.schedule), [["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"]], "schedule");
+    document.getElementById("l-grades").innerHTML = table(recent(state.grades), [["student","Ученик"],["subject","Предмет"],["grade","Оценка"],["date","Дата"],["comment","Комментарий"]], "grades");
+    document.getElementById("l-payments").innerHTML = table(recent(state.payments), [["student","Ученик"],["date","Дата"],["amount","Сумма"],["type","Тип"],["description","Описание"]], "payments");
+    document.getElementById("l-students").innerHTML = table(state.users.filter(u => u.role === "student"), [["name","Ученик"],["username","Логин"],["grade","Класс"]]);
+    document.getElementById("l-parents").innerHTML = table(state.users.filter(u => u.role === "parent"), [["name","Родитель"],["username","Логин"],["child","Ученик"]]);
     document.getElementById("l-notes").innerHTML = state.lessonNotes.length
-        ? state.lessonNotes.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(n=>`<div class="lesson-note"><div class="lesson-note-header"><span class="lesson-note-topic">${esc(n.topic)}</span><span class="lesson-note-meta">${esc(n.date)} · ${esc(n.duration)} мин · <span class="lesson-note-rating">${ratingStars(n.rating)}</span></span></div><div class="lesson-note-meta" style="margin-bottom:8px">Ученик: <strong>${esc(n.student)}</strong></div><div class="lesson-note-text">${esc(n.note)}</div></div>`).join("")
+        ? recent(state.lessonNotes).map(n => noteHtml(n, nameOf(n.student)).replace("</article>", `<button class="danger" data-delete-sheet="lessonNotes" data-delete-id="${esc(n.id)}">Удалить</button></article>`)).join("")
         : '<p class="muted">Заметок пока нет.</p>';
-    document.getElementById("l-payments").innerHTML = table(state.payments,[["student","Ученик"],["date","Дата"],["amount","Сумма"],["type","Тип"],["description","Описание"]],"payments");
     document.getElementById("l-achievements").innerHTML = state.achievements.length
-        ? state.achievements.map(a=>`<div class="item"><div class="row"><h3>${esc(a.icon||'🏆')} ${esc(a.title)}</h3><span class="badge gold">${esc(a.date)}</span></div><p class="muted">${esc(a.description||'')}</p><p class="small">Ученик: ${esc(a.student)}</p></div>`).join("")
+        ? recent(state.achievements).map(a => `<article class="item"><div class="row"><h3>${esc(a.icon || "🏆")} ${esc(a.title)}</h3><span class="badge gold">${esc(nameOf(a.student))}</span></div>${a.description ? `<p class="muted">${esc(a.description)}</p>` : ""}<button class="danger" data-delete-sheet="achievements" data-delete-id="${esc(a.id)}">Удалить</button></article>`).join("")
         : '<p class="muted">Достижений пока нет.</p>';
     document.getElementById("l-messages").innerHTML = state.messages.length
-        ? state.messages.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(m=>`<div class="message ${m.from===adminUser.username?'outgoing':''} ${m.isRead==='true'||m.from===adminUser.username?'':'unread'}"><div class="message-meta">${m.from===adminUser.username?'Кому: '+esc(m.to):'От: '+esc(m.from)} · ${esc(m.date)}</div><div class="message-text">${esc(m.text)}</div></div>`).join("")
-        : '<p class="muted">Сообщений нет.</p>';
+        ? recent(state.messages).map(m => messageHtml(m, adminUser.username, nameOf)).join("")
+        : '<p class="muted">Сообщений пока нет.</p>';
 
-    document.querySelectorAll("[data-delete-sheet]").forEach(btn=>btn.onclick=async()=>{
-        if(!confirm("Удалить эту запись?"))return;
-        const sheet=btn.dataset.deleteSheet,id=btn.dataset.deleteId;
-        try { await apiPost({action:"deleteRow",sheet,id}); await loadData(); showToast('Удалено'); }
-        catch(e){ showToast('Не удалось удалить: '+e.message, true); }
+    document.querySelectorAll("[data-delete-sheet]").forEach(btn => btn.onclick = async () => {
+        if (!confirm("Удалить эту запись?")) return;
+        btn.disabled = true;
+        try { await apiPost({ action:"deleteRow", sheet:btn.dataset.deleteSheet, id:btn.dataset.deleteId }); await loadData(); showToast("Запись удалена"); }
+        catch (e) { btn.disabled = false; showToast("Не удалось удалить: " + e.message, true); }
     });
 }
 
-function formData(form){const o={};new FormData(form).forEach((v,k)=>o[k]=v);return o;}
+function formData(form) { const o = {}; new FormData(form).forEach((v, k) => { o[k] = v; }); return o; }
 
-async function submitForm(form, action, map) {
-    form.addEventListener("submit", async e=>{
+function submitForm(id, action, done) {
+    const form = document.getElementById(id);
+    form.addEventListener("submit", async e => {
         e.preventDefault();
-        const button=form.querySelector('button[type="submit"]'), oldText=button.textContent;
-        button.disabled=true; button.textContent="Сохраняем…";
+        const button = form.querySelector('button[type="submit"]'), oldText = button.textContent;
+        button.disabled = true; button.textContent = "Сохраняем…";
         try {
-            await apiPost(Object.assign({action}, map(formData(form))));
+            await apiPost(Object.assign({ action }, formData(form)));
             form.reset();
             await loadData();
-            showToast('Сохранено');
-        } catch(err) { showToast("Не удалось: "+err.message, true); }
-        finally { button.disabled=false; button.textContent=oldText; }
+            showToast(done);
+        } catch (err) { showToast("Не удалось сохранить: " + err.message, true); }
+        finally { button.disabled = false; button.textContent = oldText; }
     });
 }
 
-submitForm(document.getElementById("f-materials"),"addMaterial",d=>({title:d.title,grade:d.grade,url:d.url,description:d.description,topic:d.topic,type:d.type}));
-submitForm(document.getElementById("f-homework"),"addHomework",d=>({student:d.student,title:d.title,assigned:d.assigned,due:d.due,link:d.link,comment:d.comment}));
-submitForm(document.getElementById("f-schedule"),"addEvent",d=>({date:d.date,time:d.time,type:d.type,title:d.title,description:d.description,student:d.student}));
-submitForm(document.getElementById("f-grades"),"addGrade",d=>({student:d.student,subject:d.subject,grade:d.grade,date:d.date,comment:d.comment}));
-submitForm(document.getElementById("f-parents"),"addParent",d=>({name:d.name,username:d.username,password:d.password,child:d.child}));
-submitForm(document.getElementById("f-notes"),"addLessonNote",d=>({date:d.date,student:d.student,topic:d.topic,note:d.note,rating:d.rating,duration:d.duration}));
-submitForm(document.getElementById("f-payments"),"addPayment",d=>({date:d.date,student:d.student,amount:d.amount,type:d.type,description:d.description}));
-submitForm(document.getElementById("f-achievements"),"addAchievement",d=>({date:d.date,student:d.student,title:d.title,description:d.description,icon:d.icon}));
-submitForm(document.getElementById("f-messages"),"addMessage",d=>({to:d.to,text:d.text}));
+submitForm("f-materials", "addMaterial", "Материал сохранён");
+submitForm("f-homework", "addHomework", "Задание выдано");
+submitForm("f-schedule", "addEvent", "Событие добавлено");
+submitForm("f-grades", "addGrade", "Оценка сохранена");
+submitForm("f-notes", "addLessonNote", "Заметка сохранена");
+submitForm("f-payments", "addPayment", "Запись добавлена");
+submitForm("f-achievements", "addAchievement", "Достижение выдано");
+submitForm("f-messages", "addMessage", "Сообщение отправлено");
+submitForm("f-students", "addStudent", "Аккаунт ученика создан");
+submitForm("f-parents", "addParent", "Аккаунт родителя создан");
 
-loadData();
+if (adminUser) loadData();
+
