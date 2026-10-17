@@ -10,13 +10,13 @@ import TUTOR_INFO from "../tutor-info.md";
 // Бесплатные модели OpenRouter: если первая перегружена, OpenRouter сам пробует следующую.
 // Без покупки кредитов бесплатных запросов 50 в сутки на весь аккаунт (общие с Telegram-ботом).
 // Перейти на платную модель: ["anthropic/claude-haiku-5.5"] — и пополнить баланс на openrouter.ai/credits.
-// Последняя — openrouter/free: OpenRouter сам выбирает любую свободную бесплатную модель.
-const MODELS = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-31b-it:free", "openrouter/free"];
+// Только проверенные модели: автоподбор openrouter/free иногда выдаёт слабые модели с ответами-кашей.
+const MODELS = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-31b-it:free", "nvidia/nemotron-3-ultra-550b-a55b:free"];
 const PER_IP_PER_HOUR = 10;      // сообщений с одного адреса в час
 const PER_DAY = 30;              // сообщений со всего сайта в сутки (UTC); остальное из квоты OpenRouter — боту
 const MAX_USER_CHARS = 1000;     // длина одного вопроса
 const MAX_HISTORY = 12;          // сколько последних реплик диалога уходит в модель
-const MAX_TOKENS = 2048;         // потолок ответа
+const MAX_TOKENS = 4096;         // потолок ответа вместе с «размышлениями» модели (бесплатные модели — не стоит денег)
 
 const ALLOWED_ORIGINS = [
   "https://dejavuuss.github.io",
@@ -128,15 +128,20 @@ async function takeQuota(env, ip) {
   return null;
 }
 
-// Бесплатные модели иногда разом перегружены у поставщиков — при таком сбое повторяем один раз.
+// Бесплатные модели иногда перегружены или возвращают пустой ответ (всё ушло в «размышления») —
+// в таких случаях спрашиваем ещё раз, один раз.
 async function askModel(env, messages) {
+  let text = "";
   try {
-    return await callOpenRouter(env, messages);
+    text = await callOpenRouter(env, messages);
   } catch (err) {
     if (!(err instanceof UpstreamError) || !(err.status === 429 || err.status >= 500)) throw err;
-    await new Promise(r => setTimeout(r, 1200));
-    return callOpenRouter(env, messages);
   }
+  if (!text) {
+    await new Promise(r => setTimeout(r, 1200));
+    text = await callOpenRouter(env, messages);
+  }
+  return text || "Не получилось сформулировать ответ. Попробуйте спросить иначе.";
 }
 
 async function callOpenRouter(env, messages) {
@@ -151,7 +156,7 @@ async function callOpenRouter(env, messages) {
         "HTTP-Referer": "https://dejavuuss.github.io/daniel_math/",
         "X-Title": "Math tutor assistant"
       },
-      body: JSON.stringify({ models: MODELS, max_tokens: MAX_TOKENS, messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages] }),
+      body: JSON.stringify({ models: MODELS, max_tokens: MAX_TOKENS, reasoning: { effort: "low" }, messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages] }),
       signal: AbortSignal.timeout(45000)
     });
   } catch (err) {
@@ -165,7 +170,7 @@ async function callOpenRouter(env, messages) {
   const choice = (data.choices || [])[0] || {};
   const text = plainText(String((choice.message && choice.message.content) || ""));
   console.log(JSON.stringify({ event: "reply", model: data.model, finish: choice.finish_reason, input: data.usage && data.usage.prompt_tokens, output: data.usage && data.usage.completion_tokens }));
-  if (!text) return "Не получилось сформулировать ответ. Попробуйте спросить иначе.";
+  if (!text) return "";
   return choice.finish_reason === "length" ? text + "…" : text;
 }
 
