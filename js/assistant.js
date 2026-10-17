@@ -6,8 +6,8 @@ import { reduceMotion } from "./fx.js";
 
 const STORE_KEY = "tutor_assistant";
 const HISTORY_LIMIT = 12;
-const GREETING = "Здравствуйте! Я Смотритель этого музея и помощник репетитора. Спросите о занятиях, ценах и записи — или о задаче, которая не даётся.";
-const SUGGESTIONS = ["Сколько стоит занятие?", "Как записаться?", "Помогите с задачей"];
+const GREETING = "Здравствуйте! Я Смотритель этого музея и помощник репетитора. Спросите о чём угодно: о занятиях и записи, о задаче, которая не даётся, или о любом другом предмете.";
+const SUGGESTIONS = ["Сколько стоит занятие?", "Помогите с задачей", "Объясните тему по физике"];
 
 export function mountAssistant() {
   if (!ASSISTANT_URL || document.querySelector(".assistant")) return;
