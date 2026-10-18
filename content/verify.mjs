@@ -50,9 +50,26 @@ for (const p of [...problems, ...testItems]) {
   else if ((m = /^Вычислите удобным способом: \$(\d+) \\cdot (\d+)\$\.$/.exec(t))) expect = m[1] * m[2];
   else if ((m = /^Решите систему \$\\begin\{cases\} x \+ y = (-?\d+) \\\\ x - y = (-?\d+) \\end\{cases\}\$\. В ответ запишите произведение \$xy\$\.$/.exec(t))) { const x = (+m[1] + +m[2]) / 2; expect = x * (m[1] - x); }
   else if ((m = /^Найдите наибольший общий делитель чисел (\d+) и (\d+)\.$/.exec(t))) { let x = +m[1], y = +m[2]; while (y) [x, y] = [y, x % y]; expect = x; }
+  // Простые примеры начальной школы: одно действие.
+  else if ((m = /^(?:Сколько будет|Вычислите:) \$(\d+) (\+|-|\\cdot|:) (\d+)\$[?.]$/.exec(t))) {
+    const x = +m[1], y = +m[3];
+    expect = m[2] === "+" ? x + y : m[2] === "-" ? x - y : m[2] === ":" ? x / y : x * y;
+  }
+  else if ((m = /^Число (\d+) — это (\d+) и сколько ещё\?$/.exec(t))) expect = m[1] - m[2];
+  else if ((m = /^Найдите периметр прямоугольника со сторонами (\d+) см и (\d+) см/.exec(t))) expect = 2 * (+m[1] + +m[2]);
+  else if ((m = /^Найдите периметр квадрата со стороной (\d+) см/.exec(t))) expect = 4 * m[1];
+  else if ((m = /^Найдите площадь прямоугольника со сторонами (\d+) см и (\d+) см/.exec(t))) expect = m[1] * m[2];
+  else if ((m = /^Найдите \$\\frac\{(\d+)\}\{(\d+)\}\$ от числа (\d+)\.$/.exec(t))) expect = m[3] / m[2] * m[1];
+  else if ((m = /^Разделите (\d+) на (\d+) с остатком/.exec(t))) expect = m[1] % m[2];
   if (expect === null) continue;
   rechecked++;
   if (!(Math.abs(expect - a) < 1e-6)) err(p.id, `пересчёт дал ${expect}, а в базе ${p.answer} — «${t}»`);
+}
+
+// В 1–4 классах ответы — только целые неотрицательные числа.
+for (const p of problems.filter(p => p.grade <= 4)) {
+  const a = n(p.answer);
+  if (!(Number.isInteger(a) && a >= 0)) err(p.id, `ответ «${p.answer}» не подходит для ${p.grade} класса`);
 }
 
 for (const t of tests) {

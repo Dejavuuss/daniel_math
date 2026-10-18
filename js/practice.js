@@ -134,6 +134,10 @@ export function mountBank(box, problems, storageKey, grade) {
     if (topic && !topics.includes(topic)) topic = "";
     const list = filtered().sort((a, b) => a.difficulty - b.difficulty);
     const done = list.filter(p => solved.has(p.id)).length;
+    if (!list.length && mine) {
+      box.innerHTML = `<p class="muted">Для ${esc(grade)} класса задач пока нет.</p><button type="button" class="chip" data-scope="all">Показать задачи всех классов</button>`;
+      return;
+    }
     box.innerHTML = `${grade ? `<div class="bank-filters bank-scope" role="group" aria-label="Класс">
         <button type="button" class="chip${mine ? " active" : ""}" data-scope="mine">${esc(grade)} класс</button>
         <button type="button" class="chip${mine ? "" : " active"}" data-scope="all">Все классы</button>
