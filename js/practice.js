@@ -120,17 +120,25 @@ export function mountTests(box, opts) {
 const dots = n => `<span class="difficulty" aria-label="Сложность ${n} из 3">${"●".repeat(n)}${"○".repeat(3 - n)}</span>`;
 
 // Решённые задачи запоминаются в браузере ученика (storageKey — свой для каждого логина).
-export function mountBank(box, problems, storageKey) {
-  let topic = "", solved = new Set();
+// grade — класс ученика: по умолчанию показываем задачи его класса (и задачи без класса).
+export function mountBank(box, problems, storageKey, grade) {
+  let topic = "", mine = !!grade, solved = new Set();
   try { solved = new Set(JSON.parse(localStorage.getItem(storageKey) || "[]")); } catch (_) {}
   const save = () => { try { localStorage.setItem(storageKey, JSON.stringify([...solved])); } catch (_) {} };
-  const topics = [...new Set(problems.map(p => p.topic))].sort((a, b) => a.localeCompare(b, "ru"));
+  const pool = () => problems.filter(p => !mine || p.grade == null || String(p.grade) === String(grade));
+  const filtered = () => pool().filter(p => !topic || p.topic === topic);
 
   function render() {
     if (!problems.length) { box.innerHTML = '<p class="muted">Задач пока нет.</p>'; return; }
-    const list = problems.filter(p => !topic || p.topic === topic).sort((a, b) => a.difficulty - b.difficulty);
+    const topics = [...new Set(pool().map(p => p.topic))].sort((a, b) => a.localeCompare(b, "ru"));
+    if (topic && !topics.includes(topic)) topic = "";
+    const list = filtered().sort((a, b) => a.difficulty - b.difficulty);
     const done = list.filter(p => solved.has(p.id)).length;
-    box.innerHTML = `<div class="bank-filters" role="group" aria-label="Тема">
+    box.innerHTML = `${grade ? `<div class="bank-filters bank-scope" role="group" aria-label="Класс">
+        <button type="button" class="chip${mine ? " active" : ""}" data-scope="mine">${esc(grade)} класс</button>
+        <button type="button" class="chip${mine ? "" : " active"}" data-scope="all">Все классы</button>
+      </div>` : ""}
+      <div class="bank-filters" role="group" aria-label="Тема">
         <button type="button" class="chip${topic ? "" : " active"}" data-topic="">Все темы</button>
         ${topics.map(t => `<button type="button" class="chip${t === topic ? " active" : ""}" data-topic="${esc(t)}">${esc(t)}</button>`).join("")}
       </div>
@@ -151,8 +159,9 @@ export function mountBank(box, problems, storageKey) {
   }
 
   box.onclick = e => {
-    const chip = e.target.closest("[data-topic]");
+    const chip = e.target.closest("[data-topic]"), scope = e.target.closest("[data-scope]");
     if (chip) { topic = chip.dataset.topic; render(); }
+    if (scope) { mine = scope.dataset.scope === "mine"; render(); }
   };
   box.onsubmit = e => {
     const form = e.target.closest(".problem-check");
@@ -169,7 +178,7 @@ export function mountBank(box, problems, storageKey) {
     else card.classList.add("shake");
   };
   function updateProgress() {
-    const list = problems.filter(p => !topic || p.topic === topic);
+    const list = filtered();
     const done = list.filter(p => solved.has(p.id)).length;
     const bar = box.querySelector(".bank-progress");
     if (bar) { bar.querySelector("span").style.setProperty("--p", `${done / list.length * 100}%`); bar.querySelector("b").textContent = `Решено ${done} из ${list.length}`; }

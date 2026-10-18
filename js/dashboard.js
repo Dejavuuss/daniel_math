@@ -53,7 +53,7 @@ async function loadData() {
                 if (key) state.testKeys[testId] = key;
             }
         });
-        mountBank(document.getElementById("bank"), state.problems, "tutor_bank_solved_" + currentUser.username);
+        mountBank(document.getElementById("bank"), state.problems, "tutor_bank_solved_" + currentUser.username, currentUser.role === "student" ? currentUser.grade : "");
         updateStats();
         setStatus(status, "Данные обновлены", "ok");
     } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }

@@ -491,6 +491,9 @@ td button.att-file{max-width:200px}
 
 /* ---------- Банк задач ---------- */
 .bank-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.bank-scope{padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
+/* Переносы строк из текстов (шпаргалки, комментарии, заметки) сохраняются. */
+.item p,.lesson-note-text,.message-text,.problem-text,.problem-solution p{white-space:pre-line}
 .chip{padding:7px 14px;min-height:34px;font-size:.8rem;color:var(--muted)}
 .chip.active{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
 .bank-progress{position:relative;display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:.82rem;color:var(--muted)}
