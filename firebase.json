@@ -10,6 +10,8 @@
       "firestore.rules",
       "firestore.indexes.json",
       "**/.*",
+      "**/.*/**",
+      ".git/**",
       "**/node_modules/**",
       "legacy/**",
       "migration/**",
