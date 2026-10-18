@@ -7,7 +7,7 @@ import { reduceMotion } from "./fx.js";
 const STORE_KEY = "tutor_assistant";
 const HISTORY_LIMIT = 12;
 const GREETING = "Здравствуйте! Я ИИ-ассистент сайта «Уроки с Даниилом». Спросите о чём угодно: о занятиях и записи, о задаче, которая не даётся, или о любом другом предмете.";
-const SUGGESTIONS = ["Сколько стоит занятие?", "Помогите с задачей", "Объясните тему по физике"];
+const SUGGESTIONS = ["Помогите с задачей", "Объясните тему по физике"];
 
 export function mountAssistant() {
   if (!ASSISTANT_URL || document.querySelector(".assistant")) return;
