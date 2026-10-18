@@ -350,3 +350,32 @@ test("банк задач: читают все участники, пишет т
   await assertSucceeds(getDocs(collection(as("ivan"), "problems")));
   await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), "problems")));
 });
+
+/* ---------- Классы, тест в ДЗ, тренировка на оценку ---------- */
+
+test("репетитор меняет класс ученика, ученик себе — нет", async () => {
+  await assertSucceeds(updateDoc(doc(as("teacher"), "users", "ivan"), { grade:8 }));
+  await assertFails(updateDoc(doc(as("teacher"), "users", "ivan"), { grade:12 }));
+  await assertFails(updateDoc(doc(as("ivan"), "users", "ivan"), { grade:11 }));
+});
+
+test("ДЗ с тестом: старые задания без testId по-прежнему отмечаются", async () => {
+  await assertSucceeds(addDoc(collection(as("teacher"), "homework"), hw("ivan", { testId:"t1" })));
+  await assertFails(addDoc(collection(as("teacher"), "homework"), hw("ivan", { testId:"x".repeat(65) })));
+  await assertSucceeds(updateDoc(doc(as("ivan"), "homework", "h-ivan"), { status:"done" }));
+  await assertFails(updateDoc(doc(as("ivan"), "homework", "h-ivan"), { testId:"другой" }));
+});
+
+test("тренировка на оценку: только своя и строго по шкале", async () => {
+  const r = (extra = {}) => Object.assign({ student:"ivan", topic:"Дроби", correct:4, total:5, grade:4, date:"2026-10-18" }, extra);
+  const i = as("ivan");
+  await assertSucceeds(addDoc(collection(i, "practiceResults"), r()));
+  await assertSucceeds(addDoc(collection(i, "practiceResults"), r({ correct:5, grade:5 })));
+  await assertSucceeds(addDoc(collection(i, "practiceResults"), r({ correct:1, grade:2 })));
+  await assertFails(addDoc(collection(i, "practiceResults"), r({ correct:1, grade:5 })));
+  await assertFails(addDoc(collection(i, "practiceResults"), r({ correct:6 })));
+  await assertFails(addDoc(collection(i, "practiceResults"), r({ student:"anna" })));
+  await assertFails(addDoc(collection(as("parent_ivan"), "practiceResults"), r({ student:"parent_ivan" })));
+  await assertSucceeds(getDocs(query(collection(as("parent_ivan"), "practiceResults"), where("student", "==", "ivan"))));
+  await assertFails(getDocs(query(collection(as("anna"), "practiceResults"), where("student", "==", "ivan"))));
+});

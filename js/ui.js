@@ -23,6 +23,36 @@ export function average(grades) {
   return grades.length ? (grades.reduce((s, g) => s + Number(g.grade || 0), 0) / grades.length).toFixed(1) : "—";
 }
 
+/* ---------- Раскрывающиеся группы ---------- */
+
+// Состояние групп переживает перерисовку списков (после сохранения записи группы не схлопываются).
+const foldState = new Map();
+document.addEventListener("toggle", e => {
+  const d = e.target;
+  if (d instanceof HTMLDetailsElement && d.dataset.fold) foldState.set(d.dataset.fold, d.open);
+}, true);
+
+// key — уникальный ключ группы; opts.open — открыта ли по умолчанию; opts.count — число справа; opts.note — подпись.
+export function fold(key, title, inner, opts = {}) {
+  const open = foldState.has(key) ? foldState.get(key) : !!opts.open;
+  return `<details class="fold" data-fold="${esc(key)}"${open ? " open" : ""}>
+    <summary><span class="fold-title">${title}</span>${opts.note ? `<span class="fold-note">${esc(opts.note)}</span>` : ""}${opts.count != null ? `<span class="fold-count">${esc(opts.count)}</span>` : ""}</summary>
+    <div class="fold-body">${inner}</div>
+  </details>`;
+}
+
+// Группировка массива: [[ключ, элементы], …] в порядке order (или по первому появлению).
+export function groupBy(list, keyOf, order) {
+  const map = new Map();
+  (order || []).forEach(k => map.set(k, []));
+  list.forEach(x => { const k = keyOf(x); if (!map.has(k)) map.set(k, []); map.get(k).push(x); });
+  return [...map.entries()].filter(([, items]) => items.length);
+}
+
+const MONTHS_NOM = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+export const monthOf = s => { const m = /^(\d{4})-(\d{2})/.exec(String(s || "")); return m ? `${MONTHS_NOM[+m[2] - 1]} ${m[1]}` : "Без даты"; };
+export const classLabel = g => g === "" || g == null ? "Для всех классов" : `${g} класс`;
+
 export function showToast(msg, isError = false) {
   const t = document.createElement("div");
   t.className = "toast" + (isError ? " error" : "");

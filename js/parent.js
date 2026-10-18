@@ -1,11 +1,11 @@
-import { requireAuth, apiGet, logout } from "./auth.js";
+import { requireAuth, apiGet, logout, today } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { mountArt, QUOTES } from "./art.js";
-import { esc, byDate, fmtDate, average, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, stars } from "./ui.js";
+import { esc, byDate, fmtDate, average, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, stars, fold, groupBy, monthOf, classLabel } from "./ui.js";
 import { TYPE_INFO } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
 import { autoTypeset } from "./math.js";
-import { mountTests } from "./practice.js";
+import { mountTests, gradeRecords } from "./practice.js";
 
 let files = [];
 
@@ -32,7 +32,7 @@ async function loadParentData() {
         if (child) bindSolutionUploads(document.getElementById("parentHomework"), child.username, loadParentData);
         const childName = child ? child.name : "ученик";
         const nameOf = u => (data.users.find(x => x.username === u) || {}).name || u;
-        const hw = data.homework, grades = data.grades, events = data.schedule, notes = data.lessonNotes.slice().sort(byDate).reverse();
+        const hw = data.homework, grades = gradeRecords(data, ""), events = data.schedule, notes = data.lessonNotes.slice().sort(byDate).reverse();
         if (child) document.getElementById("childLine").textContent = `${child.name}: занятия и успехи.`;
 
         mountStats(document.getElementById("parentStats"), [
@@ -54,31 +54,63 @@ async function loadParentData() {
             ? msgs.map(m => messageHtml(m, parentUser.username, nameOf, filesHtml("message", m.id))).join("")
             : '<p class="muted small">Сообщений пока нет.</p>';
 
-        document.getElementById("parentHomework").innerHTML = hw.length ? hw.slice().sort((a, b) => String(a.due).localeCompare(String(b.due))).map(h => `<article class="item">
-            <div class="row"><h3>${esc(h.title)}</h3><span class="badge ${h.status === "done" ? "done" : "pending"}">${h.status === "done" ? "выполнено" : "не выполнено"}</span></div>
+        const now = today();
+        const hwCard = h => {
+            const done = h.status === "done", overdue = !done && String(h.due).slice(0, 10) < now;
+            const test = h.testId && data.tests.find(t => t.id === h.testId);
+            return `<article class="item">
+            <div class="row"><h3>${esc(h.title)}</h3><span class="badge ${done ? "done" : overdue ? "overdue" : "pending"}">${done ? "выполнено" : overdue ? "просрочено" : "не выполнено"}</span></div>
             <p class="muted small">Выдано ${esc(fmtDate(h.assigned))}, срок ${esc(fmtDate(h.due))}</p>
+            ${h.comment ? `<p class="muted small">${esc(h.comment)}</p>` : ""}
             ${h.link ? `<a class="resource-link" href="${esc(h.link)}" target="_blank" rel="noopener noreferrer">Открыть материал</a>` : ""}
+            ${test ? `<div class="hw-test"><span>Тест: <b>${esc(test.title)}</b>${data.testResults.some(r => r.testId === test.id) ? " — сдан" : " — не сдан"}</span></div>` : ""}
             ${filesHtml("homework", h.id)}
             ${child ? `<div class="hw-actions">${solutionButtonHtml(h.id)}</div>` : ""}
-        </article>`).join("") : `<p class="muted">${esc(childName)}: домашних заданий пока нет.</p>`;
+        </article>`;
+        };
+        const hwSorted = hw.slice().sort((a, b) => String(a.due).localeCompare(String(b.due)));
+        const hwGroups = [
+            ["p-hw-todo", "Не выполнено", hwSorted.filter(h => h.status !== "done"), true],
+            ["p-hw-done", "Выполнено", hwSorted.filter(h => h.status === "done").reverse(), false]
+        ].filter(([, , items]) => items.length);
+        document.getElementById("parentHomework").innerHTML = hwGroups.length
+            ? hwGroups.map(([key, title, items, open]) => fold(key, title, items.map(hwCard).join(""), { open, count:items.length })).join("")
+            : `<p class="muted">${esc(childName)}: домашних заданий пока нет.</p>`;
 
-        document.getElementById("parentGrades").innerHTML = grades.length ? `<div class="table-wrap"><table><thead><tr><th>Дата</th><th>Предмет</th><th>Оценка</th><th>Комментарий</th></tr></thead><tbody>${grades.slice().sort(byDate).reverse().map(g => `<tr><td>${esc(fmtDate(g.date))}</td><td>${esc(g.subject)}</td><td><strong>${esc(g.grade)}</strong></td><td>${esc(g.comment)}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Оценок пока нет.</p>';
+        const gradeTable = list => `<div class="table-wrap"><table><thead><tr><th>Дата</th><th>За что</th><th>Оценка</th><th>Комментарий</th></tr></thead><tbody>${list.slice().sort(byDate).reverse().map(g => `<tr><td>${esc(fmtDate(g.date))}</td><td>${esc(g.subject)}</td><td><strong>${esc(g.grade)}</strong></td><td>${esc(g.comment)}</td></tr>`).join("")}</tbody></table></div>`;
+        const kinds = [["lesson", "Оценки за занятия"], ["test", "Тесты"], ["practice", "Тренировки на оценку"]];
+        document.getElementById("parentGrades").innerHTML = grades.length ? kinds.map(([kind, title], i) => {
+            const list = grades.filter(g => g.kind === kind);
+            return list.length ? fold("p-grades-" + kind, title, gradeTable(list), { open:i === 0, count:list.length, note:"средний " + average(list) }) : "";
+        }).join("") : '<p class="muted">Оценок пока нет.</p>';
 
-        document.getElementById("parentNotes").innerHTML = notes.length ? notes.map(n => noteHtml(n)).join("") : '<p class="muted">Заметок пока нет.</p>';
+        document.getElementById("parentNotes").innerHTML = notes.length
+            ? groupBy(notes, n => monthOf(n.date)).map(([month, list], i) => fold("p-notes-" + month, esc(month), list.map(n => noteHtml(n)).join(""), { open:i === 0, count:list.length })).join("")
+            : '<p class="muted">Заметок пока нет.</p>';
 
-        document.getElementById("parentSchedule").innerHTML = events.length ? events.slice().sort((a, b) => (String(a.date) + String(a.time)).localeCompare(String(b.date) + String(b.time))).map(ev => `<article class="item">
+        const evCard = ev => `<article class="item">
             <div class="row"><h3>${esc(ev.title)}</h3><span class="badge plain"><i class="dot ${esc(ev.type)}"></i>${esc(TYPE_INFO[ev.type] || ev.type)}</span></div>
             <p class="muted small">${esc(fmtDate(ev.date))}${ev.time ? ", " + esc(ev.time) : ""}</p>
             ${ev.description ? `<p>${esc(ev.description)}</p>` : ""}
-        </article>`).join("") : '<p class="muted">Событий пока нет.</p>';
+        </article>`;
+        const evSorted = events.slice().sort((a, b) => (String(a.date) + String(a.time)).localeCompare(String(b.date) + String(b.time)));
+        const upcoming = evSorted.filter(ev => String(ev.date).slice(0, 10) >= now), past = evSorted.filter(ev => String(ev.date).slice(0, 10) < now).reverse();
+        document.getElementById("parentSchedule").innerHTML = events.length
+            ? fold("p-ev-next", "Предстоящие", upcoming.length ? upcoming.map(evCard).join("") : '<p class="empty-note">Ближайших событий нет.</p>', { open:true, count:upcoming.length })
+              + (past.length ? fold("p-ev-past", "Прошедшие", past.map(evCard).join(""), { count:past.length }) : "")
+            : '<p class="muted">Событий пока нет.</p>';
 
-        document.getElementById("parentMaterials").innerHTML = data.materials.length ? data.materials.map(m => `<article class="item">
-            <h3>${esc(m.title)}</h3>
-            ${m.topic ? `<p class="muted small">${esc(m.topic)}</p>` : ""}
+        const childGrade = child && child.grade ? String(child.grade) : "";
+        const materials = data.materials.filter(m => !childGrade || !m.grade || String(m.grade) === childGrade);
+        const order = [...Array.from({ length:11 }, (_, i) => String(i + 1)), ""];
+        document.getElementById("parentMaterials").innerHTML = materials.length
+            ? groupBy(materials, m => m.grade ? String(m.grade) : "", order).map(([g, items]) => fold("p-materials-" + (g || "all"), esc(classLabel(g)), items.map(m => `<article class="item">
+            <div class="row"><h3>${esc(m.title)}</h3>${m.topic ? `<span class="badge plain">${esc(m.topic)}</span>` : ""}</div>
             ${m.description ? `<p class="muted">${esc(m.description)}</p>` : ""}
             ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer" class="resource-link">Открыть материал</a>` : ""}
             ${filesHtml("material", m.id)}
-        </article>`).join("") : '<p class="muted">Материалов пока нет.</p>';
+        </article>`).join(""), { open:g === childGrade, count:items.length })).join("")
+            : '<p class="muted">Материалов пока нет.</p>';
 
         mountTests(document.getElementById("parentTests"), {
             tests:data.tests, results:data.testResults, keys:data.testKeys, grade:child ? child.grade : "", canTake:false, onSubmitted:() => {}

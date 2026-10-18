@@ -1,15 +1,16 @@
 import { requireAuth, apiGet, apiPost, logout, today } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { mountArt, QUOTES } from "./art.js";
-import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml } from "./ui.js";
+import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel } from "./ui.js";
 import { renderCalendar } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
 import { autoTypeset } from "./math.js";
-import { mountTests, mountBank } from "./practice.js";
+import { mountTests, mountBank, gradeRecords } from "./practice.js";
 
 const currentUser = requireAuth();
 if (currentUser && currentUser.role === "parent") location.replace("parent.html");
-let state = null;
+const isStudent = currentUser && currentUser.role === "student";
+let state = null, testsUi = null;
 
 initPage();
 initTabs();
@@ -28,12 +29,18 @@ const filesHtml = (kind, id) => attachmentsHtml(filesFor(state.files, kind, id),
     note:f => kind === "homework" && f.owner === currentUser.username ? "твоё решение" : ""
 });
 const nameOf = u => (state.users.find(x => x.username === u) || {}).name || u;
+// Класс берём из свежих данных: его мог поменять репетитор.
+const myGrade = () => isStudent ? ((state.users.find(u => u.username === currentUser.username) || currentUser).grade ?? "") : "";
+const myGrades = () => gradeRecords(state, isStudent ? currentUser.username : "");
+const openTab = id => document.querySelector(`.tab[data-tab="${id}"]`)?.click();
 
 async function loadData() {
     const status = document.getElementById("loadStatus");
     setStatus(status, "Обновляем данные…");
     try {
         state = await apiGet();
+        const grade = myGrade();
+        document.getElementById("classHint").textContent = grade ? `${grade} класс` : isStudent ? "класс не указан" : "все классы";
         renderMaterials();
         renderHomework();
         renderLessonNotes();
@@ -45,18 +52,29 @@ async function loadData() {
         events.push(...state.homework.filter(h => h.student === currentUser.username && h.due)
             .map(h => ({ date:String(h.due).slice(0, 10), time:"", type:"deadline", title:"Дедлайн: " + h.title, description:"" })));
         renderCalendar(document.getElementById("calendar"), events);
-        mountTests(document.getElementById("tests"), {
-            tests:state.tests, results:state.testResults, keys:state.testKeys, grade:currentUser.grade,
-            canTake:currentUser.role === "student",
-            onSubmitted:(testId, answers, key) => {
-                state.testResults.push({ id:`${testId}_${currentUser.username}`, testId, student:currentUser.username, answers, date:today() });
-                if (key) state.testKeys[testId] = key;
-            }
+        testsUi = mountTests(document.getElementById("tests"), {
+            tests:state.tests, results:state.testResults, keys:state.testKeys, grade,
+            canTake:isStudent, onSubmitted:testSubmitted
         });
-        mountBank(document.getElementById("bank"), state.problems, "tutor_bank_solved_" + currentUser.username, currentUser.role === "student" ? currentUser.grade : "");
+        mountBank(document.getElementById("bank"), state.problems, "tutor_bank_solved_" + currentUser.username, {
+            grade, canGrade:isStudent,
+            noGradeNote:isStudent && !grade ? "Репетитор ещё не указал твой класс, поэтому показаны задачи всех классов." : "",
+            onSaved:item => { state.practiceResults.push(item); renderProgress(); updateStats(); }
+        });
         updateStats();
         setStatus(status, "Данные обновлены", "ok");
     } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }
+}
+
+// Тест сдан: результат — в успеваемость, а задание, к которому он прикреплён, отмечаем выполненным.
+async function testSubmitted(testId, answers, key) {
+    state.testResults.push({ id:`${testId}_${currentUser.username}`, testId, student:currentUser.username, answers, date:today() });
+    if (key) state.testKeys[testId] = key;
+    const linked = state.homework.filter(h => h.testId === testId && h.student === currentUser.username && h.status !== "done");
+    for (const h of linked) {
+        try { await apiPost({ action:"updateHomeworkStatus", homeworkId:h.id, status:"done" }); h.status = "done"; } catch (_) {}
+    }
+    renderHomework(); renderDeadlines(); renderProgress(); updateStats();
 }
 
 function updateStats() {
@@ -64,13 +82,13 @@ function updateStats() {
     mountStats(document.getElementById("dashboardStats"), [
         [mine.length, "заданий в списке"],
         [mine.filter(h => h.status !== "done").length, "осталось сделать"],
-        [average(state.grades), "средний балл из 5"],
+        [average(myGrades()), "средний балл из 5"],
         [state.achievements.length, "достижений"]
     ], countUp);
 }
 
 function renderProgress() {
-    document.getElementById("progressChart").innerHTML = gradeBars(state.grades);
+    document.getElementById("progressChart").innerHTML = gradeBars(myGrades());
 }
 
 function renderAchievements() {
@@ -108,54 +126,79 @@ async function renderMessages() {
 
 function renderLessonNotes() {
     const notes = state.lessonNotes.slice().sort(byDate).reverse();
-    document.getElementById("lessonNotes").innerHTML = notes.length
-        ? notes.map(n => noteHtml(n)).join("")
-        : '<p class="muted">После первого занятия здесь появится заметка: что прошли и что повторить.</p>';
+    const box = document.getElementById("lessonNotes");
+    if (!notes.length) { box.innerHTML = '<p class="muted">После первого занятия здесь появится заметка: что прошли и что повторить.</p>'; return; }
+    box.innerHTML = groupBy(notes, n => monthOf(n.date)).map(([month, list], i) =>
+        fold("notes-" + month, esc(month), list.map(n => noteHtml(n)).join(""), { open:i === 0, count:list.length })).join("");
 }
 
+// Материалы по классам: свой класс и общие открыты, у репетитора — все классы свёрнутыми группами.
 function renderMaterials() {
-    const list = state.materials.filter(m => currentUser.role === "admin" || !m.grade || String(m.grade) === String(currentUser.grade));
-    document.getElementById("materials").innerHTML = list.length ? list.map(m => `<article class="item">
-        <div class="row"><h3>${esc(m.title)}</h3><span class="badge plain">${m.grade ? esc(m.grade) + " класс" : "для всех"}</span></div>
-        ${m.topic ? `<p class="muted small">${esc(m.topic)}</p>` : ""}
-        ${m.description ? `<p class="muted">${esc(m.description)}</p>` : ""}
-        ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer" class="resource-link">Открыть материал</a>` : ""}
-        ${filesHtml("material", m.id)}
-    </article>`).join("") : '<p class="muted">Материалов пока нет.</p>';
+    const grade = myGrade();
+    const list = state.materials.filter(m => !isStudent || !grade || !m.grade || String(m.grade) === String(grade));
+    const box = document.getElementById("materials");
+    if (!list.length) { box.innerHTML = '<p class="muted">Материалов пока нет.</p>'; return; }
+    const order = [...Array.from({ length:11 }, (_, i) => String(i + 1)), ""];
+    box.innerHTML = groupBy(list, m => m.grade ? String(m.grade) : "", order).map(([g, items]) =>
+        fold("materials-" + (g || "all"), esc(classLabel(g)), items.map(m => `<article class="item">
+            <div class="row"><h3>${esc(m.title)}</h3>${m.topic ? `<span class="badge plain">${esc(m.topic)}</span>` : ""}</div>
+            ${m.description ? `<p class="muted">${esc(m.description)}</p>` : ""}
+            ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer" class="resource-link">Открыть материал</a>` : ""}
+            ${filesHtml("material", m.id)}
+        </article>`).join(""), { open:isStudent && (g === String(grade) || g === ""), count:items.length })).join("");
+}
+
+function homeworkCard(h, now) {
+    const done = h.status === "done", overdue = !done && String(h.due).slice(0, 10) < now;
+    const badge = done ? '<span class="badge done">сделано</span>' : overdue ? '<span class="badge overdue">просрочено</span>' : '<span class="badge pending">в работе</span>';
+    const test = h.testId && state.tests.find(t => t.id === h.testId);
+    const passed = test && state.testResults.some(r => r.testId === test.id && r.student === h.student);
+    return `<article class="item">
+        <div class="row"><h3>${esc(h.title)}</h3>${badge}</div>
+        ${h.comment ? `<p class="muted small">${esc(h.comment)}</p>` : ""}
+        <p class="muted small">Выдано ${esc(fmtDate(h.assigned))}, сдать до ${esc(fmtDate(h.due))}</p>
+        ${h.link ? `<a class="resource-link" href="${esc(h.link)}" target="_blank" rel="noopener noreferrer">Открыть материал</a>` : ""}
+        ${test ? `<div class="hw-test"><span>Тест: <b>${esc(test.title)}</b>${passed ? " — сдан" : ""}</span>
+            ${isStudent || passed ? `<button type="button" class="${passed ? "" : "primary"}" data-open-test="${esc(test.id)}">${passed ? "Разбор ответов" : "Пройти тест"}</button>` : ""}</div>`
+            : h.testId ? '<p class="muted small">Прикреплённый тест удалён.</p>' : ""}
+        ${filesHtml("homework", h.id)}
+        ${currentUser.role !== "admin"
+            ? `<div class="hw-actions"><button class="${done ? "" : "primary"}" data-homework="${esc(h.id)}" data-status="${done ? "pending" : "done"}">${done ? "Снять отметку" : "Отметить выполненным"}</button>${solutionButtonHtml(h.id)}</div>`
+            : `<p class="muted small">Ученик: ${esc(nameOf(h.student))}</p>`}
+    </article>`;
 }
 
 function renderHomework() {
-    const list = state.homework.filter(isMine);
+    const list = state.homework.filter(isMine).sort((a, b) => String(a.due).localeCompare(String(b.due)));
     const now = today();
     const box = document.getElementById("homework");
-    box.innerHTML = list.length ? list.slice().sort((a, b) => String(a.due).localeCompare(String(b.due))).map(h => {
-        const done = h.status === "done", overdue = !done && String(h.due).slice(0, 10) < now;
-        const badge = done ? '<span class="badge done">сделано</span>' : overdue ? '<span class="badge overdue">просрочено</span>' : '<span class="badge pending">в работе</span>';
-        return `<article class="item">
-            <div class="row"><h3>${esc(h.title)}</h3>${badge}</div>
-            ${h.comment ? `<p class="muted small">${esc(h.comment)}</p>` : ""}
-            <p class="muted small">Выдано ${esc(fmtDate(h.assigned))}, сдать до ${esc(fmtDate(h.due))}</p>
-            ${h.link ? `<a class="resource-link" href="${esc(h.link)}" target="_blank" rel="noopener noreferrer">Открыть материал</a>` : ""}
-            ${filesHtml("homework", h.id)}
-            ${currentUser.role !== "admin"
-                ? `<div class="hw-actions"><button class="${done ? "" : "primary"}" data-homework="${esc(h.id)}" data-status="${done ? "pending" : "done"}">${done ? "Снять отметку" : "Отметить выполненным"}</button>${solutionButtonHtml(h.id)}</div>`
-                : `<p class="muted small">Ученик: ${esc(h.student)}</p>`}
-        </article>`;
-    }).join("") : '<p class="muted">Домашних заданий пока нет.</p>';
-    box.querySelectorAll("[data-homework]").forEach(btn => btn.onclick = async () => {
-        const id = btn.dataset.homework, item = state.homework.find(h => String(h.id) === String(id));
-        if (!item) return;
-        const old = item.status, next = btn.dataset.status;
-        item.status = next; renderHomework(); updateStats(); renderDeadlines();
-        try {
-            await apiPost({ action:"updateHomeworkStatus", homeworkId:id, status:next });
-            if (next === "done") showToast("Отмечено как выполненное");
-        } catch (e) {
-            item.status = old; renderHomework(); updateStats(); renderDeadlines();
-            showToast("Не удалось сохранить: " + e.message, true);
-        }
-    });
+    if (!list.length) { box.innerHTML = '<p class="muted">Домашних заданий пока нет.</p>'; return; }
+    const groups = [
+        ["hw-overdue", "Просрочено", list.filter(h => h.status !== "done" && String(h.due).slice(0, 10) < now), true],
+        ["hw-active", "В работе", list.filter(h => h.status !== "done" && String(h.due).slice(0, 10) >= now), true],
+        ["hw-done", "Выполнено", list.filter(h => h.status === "done").reverse(), false]
+    ];
+    box.innerHTML = groups.filter(([, , items]) => items.length)
+        .map(([key, title, items, open]) => fold(key, title, items.map(h => homeworkCard(h, now)).join(""), { open, count:items.length })).join("");
 }
+
+document.getElementById("homework").addEventListener("click", async e => {
+    const testBtn = e.target.closest("[data-open-test]");
+    if (testBtn && testsUi) { openTab("t-tests"); testsUi.open(testBtn.dataset.openTest); return; }
+    const btn = e.target.closest("[data-homework]");
+    if (!btn) return;
+    const id = btn.dataset.homework, item = state.homework.find(h => String(h.id) === String(id));
+    if (!item) return;
+    const old = item.status, next = btn.dataset.status;
+    item.status = next; renderHomework(); updateStats(); renderDeadlines();
+    try {
+        await apiPost({ action:"updateHomeworkStatus", homeworkId:id, status:next });
+        if (next === "done") showToast("Отмечено как выполненное");
+    } catch (err) {
+        item.status = old; renderHomework(); updateStats(); renderDeadlines();
+        showToast("Не удалось сохранить: " + err.message, true);
+    }
+});
 
 autoTypeset(document.querySelector("main"));
 ["materials", "homework", "messagesList"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));

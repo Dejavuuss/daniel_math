@@ -3,6 +3,14 @@
 
 export const QUESTION_TYPES = { choice:"Выбор варианта", number:"Число", text:"Короткий ответ" };
 
+// Шкала оценивания тренировок и тестов (та же проверяется в firestore.rules → gradeMatches).
+export const GRADE_SCALE = [[90, 5], [75, 4], [50, 3], [0, 2]];
+export const SCALE_TEXT = "90% и больше — «5», от 75% — «4», от 50% — «3», меньше — «2»";
+export function gradeFor(correct, total) {
+  const pct = total ? correct * 100 / total : 0;
+  return GRADE_SCALE.find(([min]) => pct >= min)[1];
+}
+
 export function parseNumber(value) {
   const s = String(value == null ? "" : value).trim().replace(/\s+/g, "").replace(/[−–]/g, "-").replace(/,/g, ".");
   const frac = /^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(s);
@@ -32,7 +40,10 @@ export function scoreOf(test, key, answers) {
 export function checkProblem(answer, given) {
   const alts = alternatives(answer);
   const numeric = alts.length && alts.every(a => Number.isFinite(parseNumber(a)));
-  return isCorrect({ type:numeric ? "number" : "text" }, answer, given);
+  const q = { type:numeric ? "number" : "text" };
+  // Несколько ответов через «;» (например, оба корня) — верно, если верен каждый.
+  const parts = alternatives(given);
+  return parts.length > 1 ? parts.every(part => isCorrect(q, answer, part)) : isCorrect(q, answer, given);
 }
 
 // Как показать правильный ответ: для выбора — текст варианта.

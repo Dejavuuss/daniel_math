@@ -3,14 +3,14 @@
 // apiGet() возвращает весь доступный роли набор данных, apiPost({action, ...}) выполняет одно действие.
 // Права проверяются на сервере правилами firestore.rules; проверки здесь — только для понятных сообщений об ошибках.
 import { firebaseConfig, USERNAME_DOMAIN } from "./firebase-config.js";
-import { parseNumber } from "./quiz.js";
+import { parseNumber, gradeFor } from "./quiz.js";
 
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 const USER_KEY = "tutor_user";
 const THEME_KEY = "tutor_theme";
 export const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR_");
 
-export const COLLECTIONS = ["users","materials","homework","schedule","grades","lessonNotes","payments","achievements","messages","topics","tests","testResults","problems"];
+export const COLLECTIONS = ["users","materials","homework","schedule","grades","lessonNotes","payments","achievements","messages","topics","tests","testResults","problems","practiceResults"];
 const DELETABLE = COLLECTIONS.filter(c => c !== "users");
 const SUBJECTS = ["Математика","Алгебра","Геометрия"];
 // Прикреплённые файлы хранятся в Firestore кусками (Firebase Storage требует платный тариф).
@@ -60,7 +60,12 @@ export function requireAuth(role) {
 export async function apiGet() {
   const user = getCurrentUser();
   if (!user) throw new Error("Войдите в систему заново.");
-  try { return await (await backend()).load(user); } catch (e) { throw humanError(e); }
+  try {
+    const data = await (await backend()).load(user);
+    const me = data.users.find(u => u.username === user.username);
+    if (me) saveCurrentUser(Object.assign({}, user, me));
+    return data;
+  } catch (e) { throw humanError(e); }
 }
 
 // Содержимое файла (Blob) по его метаданным из apiGet().files.
@@ -85,7 +90,8 @@ const ADMIN_RECORDS = {
   }],
   addHomework: p => ["homework", {
     student:required(p.student,"Ученик",40), title:required(p.title,"Задание",300), assigned:date(p.assigned,"Дата выдачи"),
-    due:date(p.due,"Срок сдачи"), status:"pending", link:optionalUrl(p.link), comment:text(p.comment,2000)
+    due:date(p.due,"Срок сдачи"), status:"pending", link:optionalUrl(p.link), comment:text(p.comment,2000),
+    testId:text(p.testId,64)
   }],
   addEvent: p => ["schedule", {
     date:date(p.date,"Дата"), time:time(p.time), type:oneOf(p.type,["lesson","deadline","test","olympiad"],"Тип"),
@@ -183,6 +189,20 @@ async function dispatch(b, user, p) {
       };
       const id = await b.addTest(test, answers);
       return { ok:true, item:Object.assign({ id }, test) };
+    }
+    case "setGrade": {
+      needAdmin();
+      const name = username(p.username);
+      await b.update("users", name, { grade:optionalInt(p.grade, 1, 11, "Класс") });
+      return { ok:true };
+    }
+    // Тренировка на оценку: оценка — строго по шкале (её же проверяют правила).
+    case "savePractice": {
+      if (user.role !== "student") throw new Error("Тренировку на оценку проходит сам ученик.");
+      const total = int(p.total, 1, 20, "Некорректное число задач."), correct = int(p.correct, 0, total, "Некорректный результат.");
+      const data = { student:user.username, topic:required(p.topic, "Тема", 200), correct, total, grade:gradeFor(correct, total), date:today() };
+      const id = await b.add("practiceResults", data);
+      return { ok:true, item:Object.assign({ id }, data) };
     }
     case "submitTest": {
       if (user.role !== "student") throw new Error("Тест сдаёт сам ученик.");
@@ -324,7 +344,7 @@ function humanError(e) {
 /* ---------- Бэкенды ---------- */
 
 export function emptyDataset() {
-  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], testKeys:{} };
+  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], practiceResults:[], testKeys:{} };
 }
 export function publicUser(u) {
   return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || "") };
@@ -407,10 +427,11 @@ async function createFirebaseBackend() {
       const files = new Map();
       fileLists.flat().forEach(f => files.set(f.id, f));
       // Тесты: общие и свои; результаты своего ученика; ключи — только к уже сданным тестам.
-      const [tests, testResults, problems] = await Promise.all([
+      const [tests, testResults, problems, practiceResults] = await Promise.all([
         rows(F.query(col("tests"), student ? F.where("student","in",["", student]) : F.where("student","==",""))),
         student ? rows(F.query(col("testResults"), F.where("student","==",student))) : Promise.resolve([]),
-        rows(col("problems"))
+        rows(col("problems")),
+        student ? rows(F.query(col("practiceResults"), F.where("student","==",student))) : Promise.resolve([])
       ]);
       const testKeys = {};
       await Promise.all(testResults.map(async r => {
@@ -425,7 +446,7 @@ async function createFirebaseBackend() {
         homework, schedule, grades, lessonNotes, payments, achievements, topics,
         messages:[...messages.values()].sort(byDate),
         files:[...files.values()],
-        tests, testResults, problems, testKeys
+        tests, testResults, problems, practiceResults, testKeys
       });
       return data;
     },

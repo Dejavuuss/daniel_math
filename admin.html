@@ -45,7 +45,8 @@
 </div>
 
 <nav class="tabs" role="tablist" data-reveal>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="t-materials">Материалы</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="t-classes">Классы</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-materials">Материалы</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-homework">Задания</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-tests">Тесты</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-bank">Банк задач</button>
@@ -58,8 +59,15 @@
     <button class="tab" role="tab" aria-selected="false" data-tab="t-accounts">Аккаунты</button>
 </nav>
 
-<section id="t-materials" class="tab-panel active card" role="tabpanel">
-<h2>Добавить материал</h2>
+<section id="t-classes" class="tab-panel active card" role="tabpanel">
+<div class="section-heading"><h2>Классы</h2><span class="hint">от класса зависят материалы, тесты и тренировка ученика</span></div>
+<p class="form-hint">Выберите класс рядом с именем — сохраняется сразу.</p>
+<div id="l-classes"></div>
+</section>
+
+<section id="t-materials" class="tab-panel card" role="tabpanel">
+<details class="fold form-fold" data-fold="form-f-materials"><summary><span class="fold-title">Добавить материал</span></summary>
+<div class="fold-body">
 <form id="f-materials">
     <div class="grid2">
         <div><label for="m-title">Название</label><input id="m-title" name="title" required></div>
@@ -74,11 +82,13 @@
     <div data-attach></div>
     <button class="primary" type="submit">Сохранить материал</button>
 </form>
+</div></details>
 <h2 class="list-title">Материалы в базе</h2><div id="l-materials"></div>
 </section>
 
 <section id="t-homework" class="tab-panel card" role="tabpanel">
-<h2>Выдать домашнее задание</h2>
+<details class="fold form-fold" data-fold="form-f-homework"><summary><span class="fold-title">Выдать домашнее задание</span></summary>
+<div class="fold-body">
 <form id="f-homework">
     <div class="grid2">
         <div><label for="studentSelect">Ученик</label><select name="student" id="studentSelect" required></select></div>
@@ -86,17 +96,21 @@
         <div><label for="h-assigned">Дата выдачи</label><input id="h-assigned" name="assigned" type="date" required></div>
         <div><label for="h-due">Сдать до</label><input id="h-due" name="due" type="date" required></div>
     </div>
+    <label for="h-test">Тест (необязательно)</label><select id="h-test" name="testId"><option value="">Без теста</option></select>
+    <p class="form-hint">В списке — тесты для класса выбранного ученика и его личные. После сдачи теста задание отмечается выполненным само.</p>
     <label for="h-link">Ссылка на объяснение</label><input id="h-link" name="link" type="url" placeholder="https://youtube.com/watch?v=…">
     <label for="h-comment">Комментарий</label><textarea id="h-comment" name="comment" rows="2"></textarea>
     <div class="math-preview" hidden data-preview-for="h-comment"></div>
     <div data-attach></div>
     <button class="primary" type="submit">Выдать задание</button>
 </form>
+</div></details>
 <h2 class="list-title">Домашние задания</h2><div id="l-homework"></div>
 </section>
 
 <section id="t-tests" class="tab-panel card" role="tabpanel">
-<h2>Создать тест</h2>
+<details class="fold form-fold" data-fold="form-f-tests"><summary><span class="fold-title">Создать тест</span></summary>
+<div class="fold-body">
 <p class="form-hint">Ученик видит вопросы сразу, а правильные ответы — только после того, как отправит свои. Проверка и балл — автоматически.</p>
 <form id="f-tests">
     <div class="grid2">
@@ -113,11 +127,13 @@
         <button class="primary" type="submit">Сохранить тест</button>
     </div>
 </form>
+</div></details>
 <h2 class="list-title">Тесты и результаты</h2><div id="l-tests"></div>
 </section>
 
 <section id="t-bank" class="tab-panel card" role="tabpanel">
-<h2>Добавить задачу в банк</h2>
+<details class="fold form-fold" data-fold="form-f-problems"><summary><span class="fold-title">Добавить задачу в банк</span></summary>
+<div class="fold-body">
 <p class="form-hint">Ученики решают задачи сами во вкладке «Тренировка»: вводят ответ и сразу видят, верно ли, а при желании открывают решение.</p>
 <form id="f-problems">
     <div class="grid2">
@@ -133,12 +149,14 @@
     <p class="form-hint math-hint">Формулы пишите в знаках доллара: <code class="no-math">$x^2$</code>, <code class="no-math">$\frac{1}{2}$</code>, <code class="no-math">$\sqrt{x}$</code> — отобразятся как в учебнике.</p>
     <button class="primary" type="submit">Добавить задачу</button>
 </form>
+</div></details>
 <datalist id="topicList"></datalist>
 <h2 class="list-title">Банк задач</h2><div id="l-problems"></div>
 </section>
 
 <section id="t-schedule" class="tab-panel card" role="tabpanel">
-<h2>Добавить событие</h2>
+<details class="fold form-fold" data-fold="form-f-schedule"><summary><span class="fold-title">Добавить событие</span></summary>
+<div class="fold-body">
 <form id="f-schedule">
     <div class="grid2">
         <div><label for="e-date">Дата</label><input id="e-date" name="date" type="date" required></div>
@@ -150,11 +168,13 @@
     <label for="e-desc">Описание</label><textarea id="e-desc" name="description" rows="2"></textarea>
     <button class="primary" type="submit">Добавить событие</button>
 </form>
+</div></details>
 <h2 class="list-title">События календаря</h2><div id="l-schedule"></div>
 </section>
 
 <section id="t-grades" class="tab-panel card" role="tabpanel">
-<h2>Поставить оценку</h2>
+<details class="fold form-fold" data-fold="form-f-grades"><summary><span class="fold-title">Поставить оценку</span></summary>
+<div class="fold-body">
 <form id="f-grades">
     <div class="grid2">
         <div><label for="gradeStudent">Ученик</label><select name="student" id="gradeStudent" required></select></div>
@@ -165,11 +185,13 @@
     <label for="g-comment">Комментарий</label><input id="g-comment" name="comment" placeholder="Например, квадратные уравнения">
     <button class="primary" type="submit">Сохранить оценку</button>
 </form>
+</div></details>
 <h2 class="list-title">Журнал оценок</h2><div id="l-grades"></div>
 </section>
 
 <section id="t-notes" class="tab-panel card" role="tabpanel">
-<h2>Заметка с занятия</h2>
+<details class="fold form-fold" data-fold="form-f-notes"><summary><span class="fold-title">Заметка с занятия</span></summary>
+<div class="fold-body">
 <p class="form-hint">Что прошли, как ученик справился, что повторить.</p>
 <form id="f-notes">
     <div class="grid2">
@@ -183,11 +205,13 @@
     <div class="math-preview" hidden data-preview-for="n-note"></div>
     <button class="primary" type="submit">Сохранить заметку</button>
 </form>
+</div></details>
 <h2 class="list-title">История занятий</h2><div id="l-notes"></div>
 </section>
 
 <section id="t-payments" class="tab-panel card" role="tabpanel">
-<h2>Учёт платежей</h2>
+<details class="fold form-fold" data-fold="form-f-payments"><summary><span class="fold-title">Учёт платежей</span></summary>
+<div class="fold-body">
 <form id="f-payments">
     <div class="grid2">
         <div><label for="payStudent">Ученик</label><select name="student" id="payStudent" required></select></div>
@@ -198,11 +222,13 @@
     <label for="p-desc">Описание</label><input id="p-desc" name="description" placeholder="4 занятия за октябрь">
     <button class="primary" type="submit">Добавить запись</button>
 </form>
+</div></details>
 <h2 class="list-title">История платежей</h2><div id="l-payments"></div>
 </section>
 
 <section id="t-achievements" class="tab-panel card" role="tabpanel">
-<h2>Выдать достижение</h2>
+<details class="fold form-fold" data-fold="form-f-achievements"><summary><span class="fold-title">Выдать достижение</span></summary>
+<div class="fold-body">
 <form id="f-achievements">
     <div class="grid2">
         <div><label for="achStudent">Ученик</label><select name="student" id="achStudent" required></select></div>
@@ -213,11 +239,13 @@
     <label for="a-desc">Описание</label><input id="a-desc" name="description" placeholder="Решил 10 задач подряд без ошибок">
     <button class="primary" type="submit">Выдать достижение</button>
 </form>
+</div></details>
 <h2 class="list-title">Все достижения</h2><div id="l-achievements"></div>
 </section>
 
 <section id="t-messages" class="tab-panel card" role="tabpanel">
-<h2>Отправить сообщение</h2>
+<details class="fold form-fold" data-fold="form-f-messages"><summary><span class="fold-title">Отправить сообщение</span></summary>
+<div class="fold-body">
 <form id="f-messages">
     <div class="grid2">
         <div><label for="msgTo">Кому</label><select name="to" id="msgTo" required></select></div>
@@ -227,11 +255,13 @@
     <div data-attach></div>
     <button class="primary" type="submit">Отправить</button>
 </form>
+</div></details>
 <h2 class="list-title">Все сообщения</h2><div id="l-messages"></div>
 </section>
 
 <section id="t-accounts" class="tab-panel card" role="tabpanel">
-<h2>Добавить ученика</h2>
+<details class="fold form-fold" data-fold="form-f-students"><summary><span class="fold-title">Добавить ученика</span></summary>
+<div class="fold-body">
 <form id="f-students">
     <div class="grid2">
         <div><label for="s-name">Имя и фамилия</label><input id="s-name" name="name" required></div>
@@ -241,8 +271,10 @@
     </div>
     <button class="primary" type="submit">Создать аккаунт ученика</button>
 </form>
+</div></details>
 
-<h2 class="list-title">Добавить родителя</h2>
+<details class="fold form-fold" data-fold="form-f-parents"><summary><span class="fold-title">Добавить родителя</span></summary>
+<div class="fold-body">
 <form id="f-parents">
     <div class="grid2">
         <div><label for="r-name">Имя родителя</label><input id="r-name" name="name" required></div>
@@ -252,8 +284,9 @@
     </div>
     <button class="primary" type="submit">Создать аккаунт родителя</button>
 </form>
-<p class="form-hint">Пароль увидите только сейчас — передайте его ученику или родителю. Сменить пароль или удалить аккаунт можно в Firebase Console → Authentication.</p>
+</div></details>
 
+<p class="form-hint">Пароль увидите только при создании — передайте его ученику или родителю. Сменить пароль или удалить аккаунт можно в Firebase Console → Authentication.</p>
 <h2 class="list-title">Ученики</h2><div id="l-students"></div>
 <h2 class="list-title">Родители</h2><div id="l-parents"></div>
 </section>

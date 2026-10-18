@@ -36,6 +36,10 @@ rules_version = '2';
 // testKeys/{testId}         правильные ответы теста: answers — список строк; ученик видит ключ только ПОСЛЕ сдачи
 // testResults/{testId}_{student}  ответы ученика: testId, student, answers (список), date; неизменяемы.
 //                           Балл не хранится — считается из ответов и ключа, поэтому подделать его нельзя.
+// practiceResults/{id}      тренировка на оценку: student, topic ≤200, correct int, total int 1..20,
+//                           grade int 2..5 строго по шкале (90% → 5, 75% → 4, 50% → 3, иначе 2), date.
+//                           Пишет сам ученик — это самопроверка, ответы в банке открыты.
+// homework.testId           необязательный тест к домашнему заданию ('' или id теста)
 // problems/{id}             банк задач: topic 1..200, grade int 1..11 | null, difficulty int 1..3,
 //                           text 1..4000, answer 1..300, solution ≤4000 (ответы открыты — это тренировка)
 //
@@ -123,10 +127,13 @@ service cloud.firestore {
         str(d.description, 0, 2000) && str(d.topic, 0, 200) &&
         d.type in ['material', 'video', 'test', 'worksheet'];
     }
+    // testId — необязательный тест к заданию (у старых заданий поля нет).
     function isValidHomework(d) {
-      return hasExactly(d, ['student', 'title', 'assigned', 'due', 'status', 'link', 'comment']) &&
+      return d.keys().hasAll(['student', 'title', 'assigned', 'due', 'status', 'link', 'comment']) &&
+        d.keys().hasOnly(['student', 'title', 'assigned', 'due', 'status', 'link', 'comment', 'testId']) &&
         login(d.student) && str(d.title, 1, 300) && day(d.assigned) && day(d.due) &&
-        d.status in ['pending', 'done'] && url(d.link) && str(d.comment, 0, 2000);
+        d.status in ['pending', 'done'] && url(d.link) && str(d.comment, 0, 2000) &&
+        (!('testId' in d) || str(d.testId, 0, 64));
     }
     function isValidEvent(d) {
       return hasExactly(d, ['date', 'time', 'type', 'title', 'description', 'student', 'status']) &&
@@ -347,6 +354,27 @@ service cloud.firestore {
         exists(testPath(request.resource.data.testId)) &&
         get(testPath(request.resource.data.testId)).data.student in ['', myUsername()] &&
         request.resource.data.answers.size() == get(testPath(request.resource.data.testId)).data.questions.size();
+      allow delete: if isAdmin();
+    }
+
+    // Оценка тренировки должна соответствовать шкале.
+    function gradeMatches(g, c, t) {
+      return (g == 5 && c * 100 >= t * 90) ||
+        (g == 4 && c * 100 >= t * 75 && c * 100 < t * 90) ||
+        (g == 3 && c * 100 >= t * 50 && c * 100 < t * 75) ||
+        (g == 2 && c * 100 < t * 50);
+    }
+    function isValidPractice(d) {
+      return hasExactly(d, ['student', 'topic', 'correct', 'total', 'grade', 'date']) &&
+        login(d.student) && str(d.topic, 1, 200) && day(d.date) &&
+        intIn(d.total, 1, 20) && intIn(d.correct, 0, d.total) && intIn(d.grade, 2, 5) &&
+        gradeMatches(d.grade, d.correct, d.total);
+    }
+
+    match /practiceResults/{id} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      allow create: if isMember() && me().role == 'student' &&
+        isValidPractice(request.resource.data) && request.resource.data.student == myUsername();
       allow delete: if isAdmin();
     }
 
