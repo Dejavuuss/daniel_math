@@ -86,7 +86,7 @@ h3{font-size:1.12rem;line-height:1.25;font-weight:600;letter-spacing:-.01em;marg
 .side-head{display:flex;align-items:center;gap:12px;padding:16px 14px 16px 16px;border-bottom:2px solid var(--line);min-height:76px}
 .logo{flex:none;width:40px;height:40px;display:grid;place-items:center;background:var(--red);color:var(--on-red);font:800 1.35rem/1 var(--sans)}
 .side-brand{flex:1;min-width:0;line-height:1.15;overflow:hidden}
-.side-brand b{display:block;font-weight:800;font-size:1rem;letter-spacing:-.01em;white-space:nowrap}
+.side-brand b{display:block;font-weight:800;font-size:1rem;line-height:1.1;letter-spacing:-.01em}
 .side-brand span{display:block;font-size:.78rem;color:var(--muted);white-space:nowrap}
 .side-collapse svg{transition:transform .35s var(--ease)}
 .tabs{display:flex;flex-direction:column;gap:2px;padding:12px 10px;overflow-y:auto;flex:1;scrollbar-width:thin}
@@ -655,7 +655,7 @@ body.has-assistant .toast{bottom:92px}
     .hall > div:first-child,.hall .exhibit{grid-column:1 / -1}
     .hall .exhibit{max-width:420px}
     .page-login .login-card,.page-login .login-wrap .exhibit{grid-column:1 / -1;grid-row:auto}
-    .page-login .login-wrap .exhibit{max-width:380px}
+    .page-login .login-wrap .exhibit{max-width:380px;order:2}
     .portraits{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:760px){
