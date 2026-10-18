@@ -31,7 +31,7 @@
             <b>Рафаэль Санти</b>
             <i>Афинская школа</i>
             <span>1509–1511. Фреска, Станца делла Сеньятура, Ватикан</span>
-            <p>Линии пола и арок сходятся в одной точке — между Платоном и Аристотелем: это линейная перспектива, построенная по законам геометрии. В правом нижнем углу Евклид склонился над чертежом с циркулем. Подвигайте мышью — точка схода сместится.</p>
+            <p>Философы и учёные Древней Греции в одном зале: в центре Платон и Аристотель, справа внизу Евклид склонился над чертежом с циркулем. Перспектива фрески разобрана ниже, в этюде.</p>
         </figcaption>
     </figure>
 </section>
@@ -269,6 +269,8 @@
         <div><label for="s-username">Логин (латиница)</label><input id="s-username" name="username" pattern="[A-Za-z0-9._\-]{3,40}" autocapitalize="none" required></div>
         <div><label for="s-password">Пароль (от 6 символов)</label><input id="s-password" name="password" type="text" minlength="6" autocomplete="new-password" required></div>
     </div>
+    <label for="s-gen">Имя в родительном падеже (необязательно)</label><input id="s-gen" name="nameGen" placeholder="Например, Захара — для приветствия родителя">
+    <p class="form-hint">Родитель увидит: «На сайте представлена успеваемость …». Если поле пустое, имя склоняется автоматически.</p>
     <button class="primary" type="submit">Создать аккаунт ученика</button>
 </form>
 </div></details>
@@ -286,10 +288,11 @@
 </form>
 </div></details>
 
-<p class="form-hint">Пароль увидите только при создании — передайте его ученику или родителю. Сменить пароль или удалить аккаунт можно в Firebase Console → Authentication.</p>
-<h2 class="list-title">Ученики</h2><div id="l-students"></div>
+<p class="form-hint">Пароль видно только при создании — передайте его ученику или родителю. Потом каждый может сменить свой пароль сам: кнопка с ключом в шапке кабинета. Если пароль забыт, сбросить его можно в Firebase Console → Authentication.</p>
+<h2 class="list-title">Ученики</h2><p class="form-hint">Нажмите на имя, чтобы изменить данные или удалить аккаунт.</p><div id="l-students"></div>
 <h2 class="list-title">Родители</h2><div id="l-parents"></div>
 </section>
+<div id="gallery" class="gallery"></div>
 </main>
 <script type="module" src="js/admin.js"></script>
 <script type="module" src="js/assistant.js"></script>

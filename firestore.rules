@@ -112,7 +112,10 @@ service cloud.firestore {
 
     // ---------- Валидаторы документов (вызываются и в create, и в update) ----------
     function isValidUser(d, username) {
-      return hasExactly(d, ['username', 'uid', 'name', 'role', 'grade', 'child']) &&
+      // nameGen — необязательное имя ученика в родительном падеже («успеваемость Захара»)
+      return d.keys().hasAll(['username', 'uid', 'name', 'role', 'grade', 'child']) &&
+        d.keys().hasOnly(['username', 'uid', 'name', 'role', 'grade', 'child', 'nameGen']) &&
+        (!('nameGen' in d) || (str(d.nameGen, 0, 100) && d.role == 'student')) &&
         login(d.username) && d.username == username &&
         str(d.uid, 1, 128) && str(d.name, 1, 100) &&
         d.role in ['admin', 'student', 'parent'] &&

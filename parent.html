@@ -20,7 +20,7 @@
 <section class="hall">
     <div>
         <p class="hall-label">Зал Хокусая</p>
-        <h2><span class="line"><span id="parentGreeting">Здравствуйте!</span></span><span class="line"><span id="childLine">Всё важное о занятиях.</span></span></h2>
+        <h2><span class="line"><span id="parentGreeting">Здравствуйте!</span></span><span class="line sub"><span id="childLine">На сайте представлена успеваемость вашего ребёнка</span></span></h2>
         <p class="lede">Расписание, выполнение заданий, оценки и заметки репетитора о каждом занятии.</p>
         <div class="quote" id="quote"></div>
     </div>
@@ -30,7 +30,7 @@
             <b>Кацусика Хокусай</b>
             <i>Большая волна в Канагаве</i>
             <span>Около 1831. Цветная ксилография</span>
-            <p>Гребень волны распадается на «когти», повторяющие форму самой волны, а те — на ещё меньшие. Такое самоподобие математики назовут фракталом только через полтора века. В ложбине волны — крошечная Фудзи.</p>
+            <p>Самая известная японская гравюра: рыбацкие лодки в шторм, а в ложбине волны — крошечная гора Фудзи. О математике волны — ниже, в этюде.</p>
         </figcaption>
     </figure>
 </section>
@@ -49,6 +49,14 @@
         <div id="parentAchievements" class="achievements-list"></div>
     </section>
     <section class="widget" data-reveal>
+        <h3 class="widget-title">Ближайшие занятия</h3>
+        <div id="parentUpcoming"></div>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Пройдено недавно</h3>
+        <div id="parentRecentDone"></div>
+    </section>
+    <section class="widget" data-reveal>
         <h3 class="widget-title">Последние занятия</h3>
         <div id="parentRecentNotes"></div>
     </section>
@@ -59,19 +67,22 @@
 </div>
 
 <nav class="tabs" role="tablist" data-reveal>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="p-homework">Домашние задания</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="p-done">Пройдено</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-schedule">Расписание</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="p-homework">Домашние задания</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="p-grades">Оценки</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="p-tests">Тесты</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="p-notes">Заметки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-schedule">Расписание</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="p-materials">Материалы</button>
 </nav>
-<section id="p-homework" class="tab-panel active card" role="tabpanel"><h2>Домашние задания</h2><div id="parentHomework"></div></section>
+<section id="p-done" class="tab-panel active card" role="tabpanel"><div class="section-heading"><h2>Что пройдено</h2><span class="hint">тесты, задания и тренировки ребёнка</span></div><div id="parentDone"></div></section>
+<section id="p-homework" class="tab-panel card" role="tabpanel"><h2>Домашние задания</h2><div id="parentHomework"></div></section>
 <section id="p-grades" class="tab-panel card" role="tabpanel"><h2>Дневник оценок</h2><div id="parentGrades"></div></section>
 <section id="p-tests" class="tab-panel card" role="tabpanel"><h2>Тесты</h2><div id="parentTests"></div></section>
 <section id="p-notes" class="tab-panel card" role="tabpanel"><h2>Заметки с занятий</h2><div id="parentNotes"></div></section>
-<section id="p-schedule" class="tab-panel card" role="tabpanel"><h2>Расписание и события</h2><div id="parentSchedule"></div></section>
+<section id="p-schedule" class="tab-panel card" role="tabpanel"><h2>Расписание и события</h2><div id="parentCalendar"></div><h3 class="list-title">Список событий</h3><div id="parentSchedule"></div></section>
 <section id="p-materials" class="tab-panel card" role="tabpanel"><h2>Материалы</h2><div id="parentMaterials"></div></section>
+<div id="gallery" class="gallery"></div>
 </main>
 <script type="module" src="js/parent.js"></script>
 <script type="module" src="js/assistant.js"></script>

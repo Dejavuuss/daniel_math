@@ -246,6 +246,53 @@ async function dispatch(b, user, p) {
       await b.removeFiles([{ id, chunks }]);
       return { ok:true };
     }
+    // Правка аккаунта: имя; ученику — класс и имя в родительном падеже; родителю — ребёнок. Роль и логин не меняются.
+    case "updateUser": {
+      needAdmin();
+      const name = username(p.username);
+      const patch = { name:required(p.name, "Имя", 100) };
+      if (p.role === "student") Object.assign(patch, { grade:optionalInt(p.grade, 1, 11, "Класс"), nameGen:text(p.nameGen, 100) });
+      if (p.role === "parent") patch.child = required(p.child, "Ученик", 40);
+      await b.update("users", name, patch);
+      return { ok:true };
+    }
+    // Удаление аккаунта (вход закрывается: без профиля в users войти нельзя). Вместе с учеником удаляются
+    // привязанные к нему родители; withRecords — ещё и все записи: задания, оценки, заметки, сообщения…
+    case "deleteAccount": {
+      needAdmin();
+      const name = username(p.username);
+      if (name === user.username) throw new Error("Нельзя удалить собственный аккаунт.");
+      const data = await b.load(user);
+      const target = data.users.find(u => u.username === name);
+      if (!target) throw new Error("Аккаунт не найден.");
+      if (target.role === "admin") throw new Error("Аккаунт администратора удаляется только в консоли Firebase.");
+      const parents = target.role === "student" ? data.users.filter(u => u.role === "parent" && u.child === name).map(u => u.username) : [];
+      const accounts = [...parents, name];
+      if (p.withRecords) {
+        const student = target.role === "student" ? name : "";
+        const drop = async (collection, list) => {
+          for (const r of list) {
+            if (FILE_KIND[collection]) await b.removeFiles(await b.filesOf(FILE_KIND[collection], r.id));
+            if (collection === "tests") await b.removeTest(r.id); else await b.remove(collection, r.id);
+          }
+        };
+        if (student) {
+          for (const c of ["homework", "grades", "lessonNotes", "payments", "achievements", "testResults", "practiceResults", "schedule", "tests"])
+            await drop(c, data[c].filter(r => r.student === student));
+        }
+        await drop("messages", data.messages.filter(m => accounts.includes(m.from) || accounts.includes(m.to)));
+      }
+      for (const acc of accounts) await b.remove("users", acc);
+      return { ok:true, removed:accounts };
+    }
+    case "changePassword": {
+      const oldPassword = String(p.oldPassword || ""), newPassword = String(p.newPassword || "");
+      if (!oldPassword) throw new Error("Введите текущий пароль.");
+      if (newPassword.length < 6) throw new Error("Новый пароль должен содержать не менее 6 символов.");
+      if (newPassword === oldPassword) throw new Error("Новый пароль совпадает с текущим.");
+      await b.changePassword(user.username, oldPassword, newPassword);
+      return { ok:true };
+    }
     case "addStudent":
     case "addParent": {
       needAdmin();
@@ -257,6 +304,7 @@ async function dispatch(b, user, p) {
         grade:role === "student" ? optionalInt(p.grade,1,11,"Класс") : null,
         child:role === "parent" ? required(p.child,"Ученик",40) : ""
       };
+      if (role === "student") profile.nameGen = text(p.nameGen, 100);
       const password = String(p.password || "");
       if (password.length < 6) throw new Error("Пароль должен содержать не менее 6 символов.");
       return { ok:true, item:await b.createUser(profile, password) };
@@ -334,7 +382,7 @@ const ERRORS = {
   "auth/user-disabled":"Аккаунт отключён. Обратитесь к репетитору.",
   "auth/too-many-requests":"Слишком много попыток входа. Подождите несколько минут.",
   "auth/network-request-failed":"Нет связи с сервером. Проверьте интернет.",
-  "auth/email-already-in-use":"Такой логин уже существует.",
+  "auth/email-already-in-use":"Этот логин уже занят — возможно, удалённым ранее аккаунтом. Выберите другой логин.",
   "auth/weak-password":"Пароль должен содержать не менее 6 символов."
 };
 function humanError(e) {
@@ -347,7 +395,7 @@ export function emptyDataset() {
   return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], practiceResults:[], testKeys:{} };
 }
 export function publicUser(u) {
-  return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || "") };
+  return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || ""), nameGen:String(u.nameGen || "") };
 }
 const byDate = (a, b) => String(a.date).localeCompare(String(b.date));
 
@@ -389,6 +437,18 @@ async function createFirebaseBackend() {
     },
 
     logout: () => A.signOut(auth),
+
+    // Свой пароль: Firebase требует недавний вход, поэтому сначала подтверждаем текущий пароль.
+    async changePassword(name, oldPassword, newPassword) {
+      await signedIn();
+      try {
+        await A.reauthenticateWithCredential(auth.currentUser, A.EmailAuthProvider.credential(email(name), oldPassword));
+      } catch (e) {
+        if (/invalid-credential|wrong-password|invalid-login/.test(e && e.code)) throw new Error("Текущий пароль введён неверно.");
+        throw e;
+      }
+      await A.updatePassword(auth.currentUser, newPassword);
+    },
 
     async load(user) {
       await signedIn();

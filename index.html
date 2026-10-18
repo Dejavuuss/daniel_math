@@ -15,7 +15,7 @@
             <b>Леонардо да Винчи</b>
             <i>Витрувианский человек</i>
             <span>Около 1490. Перо, тушь. Галерея Академии, Венеция</span>
-            <p>Размах рук человека равен его росту — поэтому фигура вписана в квадрат. Поднятые руки и расставленные ноги касаются круга с центром в пупке. Леонардо проверял пропорции Витрувия циркулем и линейкой.</p>
+            <p>Рисунок пропорций человека по трактату древнеримского архитектора Витрувия. Геометрия этого листа разобрана ниже, в этюде.</p>
         </figcaption>
     </figure>
 
@@ -35,16 +35,19 @@
         <div class="quote" id="quote"></div>
     </section>
 </main>
+<div class="container gallery-wrap"><div id="gallery" class="gallery"></div></div>
 <script type="module">
 import { login, getCurrentUser, homeFor, DEMO } from "./js/auth.js";
 import { initPage, rotateQuotes, leave } from "./js/fx.js";
-import { mountArt, QUOTES } from "./js/art.js";
+import { QUOTES } from "./js/art.js";
+import { mountHall, mountGallery } from "./js/gallery.js";
 
 const current = getCurrentUser();
 if (current) location.replace(homeFor(current.role));
 
 initPage();
-mountArt(document.getElementById("art"), "vitruvian");
+mountHall(document.getElementById("art"), "vitruvian");
+mountGallery(document.getElementById("gallery"), "login");
 rotateQuotes(document.getElementById("quote"), QUOTES.login);
 document.getElementById("demoHint").hidden = !DEMO;
 

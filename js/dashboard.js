@@ -1,11 +1,13 @@
 import { requireAuth, apiGet, apiPost, logout, today } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
-import { mountArt, QUOTES } from "./art.js";
+import { QUOTES } from "./art.js";
+import { mountHall, mountGallery } from "./gallery.js";
 import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel } from "./ui.js";
 import { renderCalendar } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
 import { autoTypeset } from "./math.js";
 import { mountTests, mountBank, gradeRecords } from "./practice.js";
+import { mountPasswordButton } from "./account.js";
 
 const currentUser = requireAuth();
 if (currentUser && currentUser.role === "parent") location.replace("parent.html");
@@ -14,9 +16,11 @@ let state = null, testsUi = null;
 
 initPage();
 initTabs();
-mountArt(document.getElementById("art"), "melencolia");
+mountHall(document.getElementById("art"), "melencolia");
+mountGallery(document.getElementById("gallery"), "student");
 rotateQuotes(document.getElementById("quote"), QUOTES.student);
 document.getElementById("logoutBtn").onclick = logout;
+mountPasswordButton();
 if (currentUser) {
     document.getElementById("greeting").textContent = `Привет, ${currentUser.name.split(" ")[0] || currentUser.name}!`;
     if (currentUser.role === "admin") document.getElementById("adminLink").hidden = false;

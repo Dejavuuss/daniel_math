@@ -1,10 +1,12 @@
 import { requireAuth, apiGet, apiPost, logout, today, DEMO } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
-import { mountArt, QUOTES } from "./art.js";
-import { esc, byDate, fmtDate, average, showToast, setStatus, initTabs, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel } from "./ui.js";
+import { QUOTES } from "./art.js";
+import { mountHall, mountGallery } from "./gallery.js";
+import { esc, byDate, fmtDate, average, showToast, setStatus, initTabs, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel, genitive } from "./ui.js";
 import { createPicker, attach, attachmentsHtml, bindAttachments, filesFor } from "./files.js";
 import { autoTypeset, mathPreview } from "./math.js";
 import { mountTestBuilder } from "./test-builder.js";
+import { mountPasswordButton } from "./account.js";
 import { reviewHtml, gradeRecords } from "./practice.js";
 import { scoreOf, gradeFor } from "./quiz.js";
 
@@ -13,9 +15,11 @@ let state = null;
 
 initPage();
 initTabs();
-mountArt(document.getElementById("art"), "athens");
+mountHall(document.getElementById("art"), "athens");
+mountGallery(document.getElementById("gallery"), "admin");
 rotateQuotes(document.getElementById("quote"), QUOTES.admin);
 document.getElementById("logoutBtn").onclick = logout;
+mountPasswordButton();
 if (adminUser) document.getElementById("adminGreeting").textContent = greeting() + ", " + adminUser.name.split(" ")[0] + "!";
 autoTypeset(document.querySelector("main"));
 document.querySelectorAll("[data-preview-for]").forEach(out => mathPreview(document.getElementById(out.dataset.previewFor), out));
@@ -144,8 +148,7 @@ function renderLists() {
         }).join("")
         : empty("Сообщений пока нет.");
 
-    document.getElementById("l-students").innerHTML = table(students(), [["name","Ученик"],["username","Логин"],["grade","Класс"]]);
-    document.getElementById("l-parents").innerHTML = table(state.users.filter(u => u.role === "parent"), [["name","Родитель"],["username","Логин"],["child","Ученик"]]);
+    renderAccounts();
 
     renderTests();
     renderProblems();
@@ -155,6 +158,75 @@ function renderLists() {
         btn.disabled = true;
         try { await apiPost({ action:"deleteRow", sheet:btn.dataset.deleteSheet, id:btn.dataset.deleteId }); await loadData(); showToast("Запись удалена"); }
         catch (e) { btn.disabled = false; showToast("Не удалось удалить: " + e.message, true); }
+    });
+}
+
+// Аккаунты: у каждого — форма правки и удаление. Логин и роль не меняются (логин — это вход в Firebase).
+function renderAccounts() {
+    const classOptions = g => '<option value="">не указан</option>' + Array.from({ length:11 }, (_, i) => i + 1)
+        .map(n => `<option value="${n}"${String(g) === String(n) ? " selected" : ""}>${n} класс</option>`).join("");
+    const parentsOf = u => state.users.filter(x => x.role === "parent" && x.child === u.username);
+    const danger = u => `<div class="danger-zone">
+        <label><input type="checkbox" data-with-records checked> и все записи${u.role === "student" ? " ученика" : ""}</label>
+        <button type="button" class="danger" data-delete-account="${esc(u.username)}">Удалить аккаунт</button></div>`;
+    const list = students();
+    document.getElementById("l-students").innerHTML = list.length ? list.map(u => fold("a-acc-" + u.username, esc(u.name),
+        `<form class="account-form" data-account="${esc(u.username)}" data-role="student" novalidate>
+            <div class="grid2">
+                <div><label>Имя и фамилия</label><input name="name" value="${esc(u.name)}" required maxlength="100"></div>
+                <div><label>Класс</label><select name="grade">${classOptions(u.grade)}</select></div>
+                <div><label>Имя в родительном падеже</label><input name="nameGen" value="${esc(u.nameGen || "")}" placeholder="${esc(genitive(u.name))}" maxlength="100"></div>
+                <div><label>Логин</label><input value="${esc(u.username)}" disabled></div>
+            </div>
+            <p class="form-hint">Родитель видит: «На сайте представлена успеваемость ${esc(u.nameGen || genitive(u.name))}». ${parentsOf(u).length ? "Родитель: " + parentsOf(u).map(x => esc(x.name)).join(", ") + "." : "Родитель не привязан."}</p>
+            <div class="account-actions"><button class="primary" type="submit">Сохранить</button>${danger(u)}</div>
+        </form>`, { note:`${u.username}, ${u.grade ? u.grade + " класс" : "класс не указан"}` })).join("") : '<p class="empty-note">Учеников пока нет.</p>';
+
+    const parents = state.users.filter(u => u.role === "parent").sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    const childOptions = c => list.map(s => `<option value="${esc(s.username)}"${s.username === c ? " selected" : ""}>${esc(s.name)}</option>`).join("");
+    document.getElementById("l-parents").innerHTML = parents.length ? parents.map(u => fold("a-acc-" + u.username, esc(u.name),
+        `<form class="account-form" data-account="${esc(u.username)}" data-role="parent" novalidate>
+            <div class="grid2">
+                <div><label>Имя родителя</label><input name="name" value="${esc(u.name)}" required maxlength="100"></div>
+                <div><label>Ребёнок</label><select name="child">${childOptions(u.child)}</select></div>
+                <div><label>Логин</label><input value="${esc(u.username)}" disabled></div>
+            </div>
+            <p class="form-hint">Приветствие: «Здравствуйте, ${esc(String(u.name).split(",")[0].trim())}!» — имя берётся до запятой.</p>
+            <div class="account-actions"><button class="primary" type="submit">Сохранить</button>${danger(u)}</div>
+        </form>`, { note:`${u.username}, ребёнок: ${nameOf(u.child)}` })).join("") : '<p class="empty-note">Родителей пока нет.</p>';
+}
+
+for (const id of ["l-students", "l-parents"]) {
+    const box = document.getElementById(id);
+    box.addEventListener("submit", async e => {
+        const form = e.target.closest(".account-form");
+        if (!form) return;
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = "Сохраняем…";
+        try {
+            await apiPost(Object.assign({ action:"updateUser", username:form.dataset.account, role:form.dataset.role }, formData(form)));
+            await loadData();
+            showToast("Данные сохранены");
+        } catch (err) { btn.disabled = false; btn.textContent = "Сохранить"; showToast("Не удалось сохранить: " + err.message, true); }
+    });
+    box.addEventListener("click", async e => {
+        const btn = e.target.closest("[data-delete-account]");
+        if (!btn) return;
+        const name = btn.dataset.deleteAccount, u = state.users.find(x => x.username === name);
+        const withRecords = btn.closest(".danger-zone").querySelector("[data-with-records]").checked;
+        const parents = u.role === "student" ? state.users.filter(x => x.role === "parent" && x.child === name) : [];
+        const text = [`Удалить аккаунт «${u.name}» (${name})? Войти под ним больше не получится.`,
+            parents.length ? `Вместе с ним удалятся аккаунты родителей: ${parents.map(x => x.name).join(", ")}.` : "",
+            withRecords ? (u.role === "student" ? "Удалятся также все его задания, оценки, заметки, платежи, достижения, сообщения и результаты тестов." : "Удалятся также его сообщения.") : "Записи останутся в журналах.",
+            "Отменить это нельзя."].filter(Boolean).join("\n\n");
+        if (!confirm(text)) return;
+        btn.disabled = true; btn.textContent = "Удаляем…";
+        try {
+            await apiPost({ action:"deleteAccount", username:name, withRecords });
+            await loadData();
+            showToast("Аккаунт удалён");
+        } catch (err) { btn.disabled = false; btn.textContent = "Удалить аккаунт"; showToast("Не удалось удалить: " + err.message, true); }
     });
 }
 

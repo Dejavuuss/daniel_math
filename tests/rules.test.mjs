@@ -379,3 +379,21 @@ test("тренировка на оценку: только своя и стро�
   await assertSucceeds(getDocs(query(collection(as("parent_ivan"), "practiceResults"), where("student", "==", "ivan"))));
   await assertFails(getDocs(query(collection(as("anna"), "practiceResults"), where("student", "==", "ivan"))));
 });
+
+test("аккаунты: репетитор правит имя, падеж и ребёнка, удаляет; остальные — нет", async () => {
+  const t = as("teacher");
+  await assertSucceeds(updateDoc(doc(t, "users", "ivan"), { name:"Иван Сидоров", nameGen:"Ивана Сидорова" }));
+  await assertFails(updateDoc(doc(t, "users", "ivan"), { nameGen:"x".repeat(101) }));
+  await assertFails(updateDoc(doc(t, "users", "parent_ivan"), { nameGen:"Алексея" }));      // падеж — только у ученика
+  await assertFails(updateDoc(doc(t, "users", "ivan"), { extra:"1" }));
+  await assertSucceeds(updateDoc(doc(t, "users", "parent_ivan"), { name:"Алексей", child:"anna" }));
+  await assertFails(updateDoc(doc(t, "users", "parent_ivan"), { child:"teacher" }));       // ребёнок — только ученик
+  await assertFails(updateDoc(doc(t, "users", "ivan"), { role:"admin" }));
+  await assertFails(updateDoc(doc(as("ivan"), "users", "ivan"), { name:"Хакер" }));
+  await assertFails(updateDoc(doc(as("parent_ivan"), "users", "anna"), { name:"x" }));
+  await assertSucceeds(getDoc(doc(as("parent_ivan"), "users", "anna")));                   // родитель читает профиль ребёнка (и падеж)
+  await assertFails(deleteDoc(doc(as("ivan"), "users", "anna")));
+  await assertFails(deleteDoc(doc(t, "users", "teacher")));                                // себя — нельзя
+  await assertSucceeds(deleteDoc(doc(t, "users", "anna")));
+  await assertFails(getDocs(collection(as("ivan"), "users")));
+});

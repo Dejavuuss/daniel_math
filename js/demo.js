@@ -126,6 +126,9 @@ export function createDemoBackend() {
 
     async logout() {},
 
+    // В демо-режиме пароли не проверяются — смену просто принимаем.
+    async changePassword() { await wait(); },
+
     async load(user) {
       await wait();
       const db = read(), data = emptyDataset();
@@ -174,7 +177,7 @@ export function createDemoBackend() {
 
     async remove(name, id) {
       await wait();
-      const db = read(); db[name] = db[name].filter(r => r.id !== id); write(db);
+      const db = read(); db[name] = db[name].filter(r => (name === "users" ? r.username : r.id) !== id); write(db);
     },
 
     // Содержимое файлов в демо-режиме — в localStorage браузера (несколько мегабайт на всё).

@@ -53,6 +53,44 @@ const MONTHS_NOM = ["Январь","Февраль","Март","Апрель","�
 export const monthOf = s => { const m = /^(\d{4})-(\d{2})/.exec(String(s || "")); return m ? `${MONTHS_NOM[+m[2] - 1]} ${m[1]}` : "Без даты"; };
 export const classLabel = g => g === "" || g == null ? "Для всех классов" : `${g} класс`;
 
+/* ---------- Родительный падеж имени («успеваемость Захара») ---------- */
+
+// Мужские имена на -а/-я: по ним понятно, что фамилию склонять как мужскую.
+const MALE_A = new Set("никита илья кузьма фома лука савва данила гаврила саша женя миша дима ваня петя коля вова гоша лёша леша паша тима тимоха сеня федя юра гриша слава стёпа степа боря толя костя митя лёва лева яша гена рома вася валера серёжа сережа андрюша тёма тема егорка".split(" "));
+const FIRST_EXCEPT = { "лев":"Льва", "павел":"Павла", "пётр":"Петра", "петр":"Петра" };
+const cap = w => w ? w[0].toUpperCase() + w.slice(1) : w;
+const HUSHING = /[гкхжшщч]$/;
+
+function genFirst(w) {
+  const l = w.toLowerCase();
+  if (FIRST_EXCEPT[l]) return FIRST_EXCEPT[l];
+  if (l.endsWith("я")) return w.slice(0, -1) + "и";                         // Илья → Ильи, Мария → Марии
+  if (l.endsWith("а")) return w.slice(0, -1) + (HUSHING.test(l.slice(0, -1)) ? "и" : "ы"); // Никита → Никиты, Саша → Саши
+  if (/[йь]$/.test(l)) return w.slice(0, -1) + "я";                          // Алексей → Алексея, Игорь → Игоря
+  if (/[бвгджзклмнпрстфхцчшщ]$/.test(l)) return w + "а";                     // Захар → Захара
+  return w;
+}
+function genSurname(w, female) {
+  const l = w.toLowerCase();
+  if (female) {
+    if (/(ов|ев|ёв|ин|ын)а$/.test(l)) return w.slice(0, -1) + "ой";           // Петрова → Петровой
+    if (/ая$/.test(l)) return w.slice(0, -2) + "ой";                          // Белая → Белой
+    if (/[ая]$/.test(l)) return genFirst(w);
+    return w;                                                                 // Шмидт (жен.) не склоняется
+  }
+  if (/(ий|ый|ой)$/.test(l)) return w.slice(0, -2) + "ого";                   // Белый → Белого
+  if (/[бвгджзклмнпрстфхцчшщйь]$/.test(l) || /[ая]$/.test(l)) return genFirst(w);
+  return w;                                                                   // Шевченко, Черных
+}
+// «Имя [Отчество] [Фамилия]» → родительный падеж. Неочевидные случаи репетитор задаёт вручную (users.nameGen).
+export function genitive(name) {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const first = words[0].toLowerCase(), female = /[ая]$/.test(first) && !MALE_A.has(first);
+  return words.map((w, i) => cap(i === 0 ? genFirst(w)
+    : /(ич)$/i.test(w) ? w + "а" : /(вна|чна|шна)$/i.test(w) ? genFirst(w) : genSurname(w, female))).join(" ");
+}
+
 export function showToast(msg, isError = false) {
   const t = document.createElement("div");
   t.className = "toast" + (isError ? " error" : "");
