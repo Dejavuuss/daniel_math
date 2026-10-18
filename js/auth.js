@@ -12,6 +12,9 @@ export const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("
 export const COLLECTIONS = ["users","materials","homework","schedule","grades","lessonNotes","payments","achievements","messages","topics"];
 const DELETABLE = COLLECTIONS.filter(c => c !== "users");
 const SUBJECTS = ["Математика","Алгебра","Геометрия"];
+// Прикреплённые файлы хранятся в Firestore кусками (Firebase Storage требует платный тариф).
+export const FILE_LIMITS = { maxSize:5 * 1024 * 1024, maxCount:5, chunk:900000 };
+const FILE_KIND = { materials:"material", homework:"homework", messages:"message" };
 
 /* ---------- Сессия ---------- */
 
@@ -57,6 +60,14 @@ export async function apiGet() {
   const user = getCurrentUser();
   if (!user) throw new Error("Войдите в систему заново.");
   try { return await (await backend()).load(user); } catch (e) { throw humanError(e); }
+}
+
+// Содержимое файла (Blob) по его метаданным из apiGet().files.
+export async function downloadFile(meta) {
+  try {
+    const parts = await (await backend()).getFile(meta.id, meta.chunks);
+    return new Blob(parts, { type:meta.type || "application/octet-stream" });
+  } catch (e) { throw humanError(e); }
 }
 
 export async function apiPost(payload) {
@@ -130,7 +141,43 @@ async function dispatch(b, user, p) {
       needAdmin();
       const name = String(p.sheet || ""), id = String(p.id == null ? "" : p.id);
       if (!DELETABLE.includes(name) || !id) throw new Error("Некорректная запись для удаления.");
+      if (FILE_KIND[name]) await b.removeFiles(await b.filesOf(FILE_KIND[name], id));
       await b.remove(name, id);
+      return { ok:true };
+    }
+    // p.files — подготовленные js/files.js объекты {name, type, data:Uint8Array, thumb}.
+    case "attachFiles": {
+      const kind = oneOf(p.kind, ["material","homework","message"], "Тип записи");
+      const parentId = required(p.parentId, "Запись", 64);
+      const files = Array.isArray(p.files) ? p.files : [];
+      if (!files.length) return { ok:true, items:[] };
+      if (files.length > FILE_LIMITS.maxCount) throw new Error(`Можно прикрепить не больше ${FILE_LIMITS.maxCount} файлов за раз.`);
+      if (kind === "material") needAdmin();
+      const items = [];
+      for (const f of files) {
+        const size = f.data ? f.data.byteLength : 0;
+        if (!size) throw new Error(`Файл «${f.name}» пустой.`);
+        if (size > FILE_LIMITS.maxSize) throw new Error(`Файл «${f.name}» больше 5 МБ.`);
+        const chunks = [];
+        for (let i = 0; i < size; i += FILE_LIMITS.chunk) chunks.push(f.data.subarray(i, i + FILE_LIMITS.chunk));
+        const meta = {
+          name:String(f.name || "файл").slice(0, 200), type:String(f.type || "").slice(0, 100), size, chunks:chunks.length,
+          thumb:typeof f.thumb === "string" && f.thumb.length <= 40000 ? f.thumb : "",
+          kind, parentId, owner:user.username,
+          student:kind === "homework" ? required(p.student, "Ученик", 40) : "",
+          from:kind === "message" ? required(p.from, "Отправитель", 40) : "",
+          to:kind === "message" ? required(p.to, "Получатель", 40) : "",
+          date:today()
+        };
+        const id = await b.putFile(meta, chunks);
+        items.push(Object.assign({ id }, meta));
+      }
+      return { ok:true, items };
+    }
+    case "deleteFile": {
+      const id = required(p.id, "Файл", 64), chunks = int(p.chunks, 1, 6, "Некорректный файл.");
+      if (!isAdmin && p.owner !== user.username) throw new Error("Удалить можно только свой файл.");
+      await b.removeFiles([{ id, chunks }]);
       return { ok:true };
     }
     case "addStudent":
@@ -231,7 +278,7 @@ function humanError(e) {
 /* ---------- Бэкенды ---------- */
 
 export function emptyDataset() {
-  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[] };
+  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[] };
 }
 export function publicUser(u) {
   return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || "") };
@@ -281,8 +328,9 @@ async function createFirebaseBackend() {
       await signedIn();
       const data = emptyDataset();
       if (user.role === "admin") {
-        const lists = await Promise.all(COLLECTIONS.map(c => rows(col(c))));
-        COLLECTIONS.forEach((c, i) => { data[c] = lists[i]; });
+        const names = [...COLLECTIONS, "files"];
+        const lists = await Promise.all(names.map(c => rows(col(c))));
+        names.forEach((c, i) => { data[c] = lists[i]; });
         data.users = data.users.map(publicUser);
         return data;
       }
@@ -302,13 +350,23 @@ async function createFirebaseBackend() {
         rows(F.query(col("messages"), F.where("to","in",party))),
         rows(col("topics"))
       ]);
+      // Файлы — теми же запросами, что разрешают правила: материалы, ДЗ своего ученика, свои сообщения.
+      const fileLists = await Promise.all([
+        rows(F.query(col("files"), F.where("kind","==","material"))),
+        student ? rows(F.query(col("files"), F.where("kind","==","homework"), F.where("student","==",student))) : Promise.resolve([]),
+        rows(F.query(col("files"), F.where("kind","==","message"), F.where("from","in",party))),
+        rows(F.query(col("files"), F.where("kind","==","message"), F.where("to","in",party)))
+      ]);
+      const files = new Map();
+      fileLists.flat().forEach(f => files.set(f.id, f));
       const messages = new Map();
       [...sent, ...received].forEach(m => messages.set(m.id, m));
       Object.assign(data, {
         users:[publicUser(me), ...(child && child !== me ? [publicUser(child)] : [])],
         materials:materials.filter(m => m.grade == null || m.grade === "" || !child || String(m.grade) === String(child.grade)),
         homework, schedule, grades, lessonNotes, payments, achievements, topics,
-        messages:[...messages.values()].sort(byDate)
+        messages:[...messages.values()].sort(byDate),
+        files:[...files.values()]
       });
       return data;
     },
@@ -316,6 +374,38 @@ async function createFirebaseBackend() {
     async add(name, record) { await signedIn(); return (await F.addDoc(col(name), record)).id; },
     async update(name, id, patch) { await signedIn(); await F.updateDoc(F.doc(db, name, id), patch); },
     async remove(name, id) { await signedIn(); await F.deleteDoc(F.doc(db, name, id)); },
+
+    // Файл = метаданные files/{id} + куски files/{id}/chunks/{n}, пишутся одним пакетом.
+    async putFile(meta, chunks) {
+      await signedIn();
+      const ref = F.doc(col("files"));
+      const batch = F.writeBatch(db);
+      batch.set(ref, meta);
+      chunks.forEach((c, i) => batch.set(F.doc(db, "files", ref.id, "chunks", String(i)), { data:F.Bytes.fromUint8Array(c) }));
+      await batch.commit();
+      return ref.id;
+    },
+    async getFile(id, count) {
+      await signedIn();
+      const snaps = await Promise.all([...Array(count)].map((_, i) => F.getDoc(F.doc(db, "files", id, "chunks", String(i)))));
+      return snaps.map(snap => {
+        if (!snap.exists()) throw new Error("Файл повреждён или удалён.");
+        return snap.data().data.toUint8Array();
+      });
+    },
+    async filesOf(kind, parentId) {
+      await signedIn();
+      return rows(F.query(col("files"), F.where("kind","==",kind), F.where("parentId","==",parentId)));
+    },
+    async removeFiles(list) {
+      await signedIn();
+      for (const f of list) {
+        const batch = F.writeBatch(db);
+        for (let i = 0; i < f.chunks; i++) batch.delete(F.doc(db, "files", f.id, "chunks", String(i)));
+        batch.delete(F.doc(db, "files", f.id));
+        await batch.commit();
+      }
+    },
 
     async markRead(user) {
       await signedIn();

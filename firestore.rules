@@ -25,6 +25,12 @@ rules_version = '2';
 // achievements/{id}         student, title 1..120, description ≤500, date, icon ≤16
 // messages/{id}             from, to (логины), text 1..2000, date, isRead: bool
 // topics/{id}               subject, title 1..200, description ≤2000
+// files/{id}                прикреплённый файл (метаданные): name 1..200, type ≤100, size int 1..5 МБ,
+//                           chunks int 1..6, thumb ≤40000 (миниатюра data:image… или ''), kind: material|homework|message,
+//                           parentId (id записи), owner (кто загрузил = свой логин), student, from, to, date.
+//                           Для material student/from/to пустые; для homework student = ученик задания;
+//                           для message from/to = отправитель/получатель сообщения. Неизменяем после создания.
+// files/{id}/chunks/{n}     кусок содержимого файла: data — bytes ≤ 950000; n = 0..chunks-1
 //
 // Доступ:
 //   admin   — читает и пишет всё (кроме создания других админов).
@@ -224,6 +230,61 @@ service cloud.firestore {
       allow read: if isAdmin() || isMyStudent(resource.data.student);
       allow create, update: if isAdmin() && isValidAchievement(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    // ---------- Прикреплённые файлы ----------
+    function filePath(id) {
+      return /databases/$(database)/documents/files/$(id);
+    }
+    function isValidFileMeta(d) {
+      return hasExactly(d, ['name', 'type', 'size', 'chunks', 'thumb', 'kind', 'parentId', 'owner', 'student', 'from', 'to', 'date']) &&
+        str(d.name, 1, 200) && str(d.type, 0, 100) &&
+        d.size is int && d.size >= 1 && d.size <= 5242880 &&
+        d.chunks is int && d.chunks >= 1 && d.chunks <= 6 &&
+        str(d.thumb, 0, 40000) && (d.thumb == '' || d.thumb.matches('^data:image/[a-z]+;base64,.*')) &&
+        d.kind in ['material', 'homework', 'message'] && str(d.parentId, 1, 64) &&
+        day(d.date) && d.student is string && d.from is string && d.to is string;
+    }
+    // Прикрепить можно только к существующей записи, на которую у автора есть права.
+    function canAttach(d) {
+      return d.owner == myUsername() && (
+        (d.kind == 'material' && isAdmin() && d.student == '' && d.from == '' && d.to == '' &&
+          exists(/databases/$(database)/documents/materials/$(d.parentId))) ||
+        (d.kind == 'homework' && d.from == '' && d.to == '' &&
+          exists(/databases/$(database)/documents/homework/$(d.parentId)) &&
+          get(/databases/$(database)/documents/homework/$(d.parentId)).data.student == d.student &&
+          (isAdmin() || isMyStudent(d.student))) ||
+        (d.kind == 'message' && d.student == '' &&
+          exists(/databases/$(database)/documents/messages/$(d.parentId)) &&
+          get(/databases/$(database)/documents/messages/$(d.parentId)).data.from == myUsername() &&
+          get(/databases/$(database)/documents/messages/$(d.parentId)).data.from == d.from &&
+          get(/databases/$(database)/documents/messages/$(d.parentId)).data.to == d.to));
+    }
+    // Видит файл тот, кто видит запись: материалы — все, ДЗ — ученик и его родитель, сообщения — участники.
+    function canReadFile(d) {
+      return isAdmin() ||
+        (d.kind == 'material' && isMember()) ||
+        (d.kind == 'homework' && isMyStudent(d.student)) ||
+        (d.kind == 'message' && (isMyParty(d.from) || isMyParty(d.to)));
+    }
+    function isValidChunk(fileId, n) {
+      return isMember() && n.matches('^[0-5]$') &&
+        getAfter(filePath(fileId)).data.owner == myUsername() &&
+        int(n) < getAfter(filePath(fileId)).data.chunks &&
+        request.resource.data.keys().hasOnly(['data']) &&
+        request.resource.data.data is bytes && request.resource.data.data.size() <= 950000;
+    }
+
+    match /files/{fileId} {
+      allow read: if canReadFile(resource.data);
+      allow create: if isMember() && isValidFileMeta(request.resource.data) && canAttach(request.resource.data);
+      allow delete: if isAdmin() || (isMember() && resource.data.owner == myUsername());
+
+      match /chunks/{n} {
+        allow read: if canReadFile(get(filePath(fileId)).data);
+        allow create: if isValidChunk(fileId, n);
+        allow delete: if isAdmin() || (isMember() && get(filePath(fileId)).data.owner == myUsername());
+      }
     }
 
     match /messages/{id} {

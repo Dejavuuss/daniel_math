@@ -153,9 +153,10 @@ export function leave(url) {
 function pageTransitions() {
   document.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest("a[href]");
-    if (!a || a.target || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!a || a.target || a.hasAttribute("download") || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const url = new URL(a.href, location.href);
-    if (url.origin !== location.origin || url.pathname === location.pathname) return;
+    // Только обычные страницы сайта: ссылки на скачивание (blob:) и прочие схемы не трогаем.
+    if (!/^https?:$/.test(url.protocol) || url.origin !== location.origin || url.pathname === location.pathname) return;
     e.preventDefault();
     leave(url.href);
   });

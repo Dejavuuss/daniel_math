@@ -89,10 +89,11 @@ export function noteHtml(n, student) {
   </article>`;
 }
 
-export function messageHtml(m, me, nameOf) {
+// extra — готовая разметка под текстом (например, прикреплённые файлы).
+export function messageHtml(m, me, nameOf, extra = "") {
   const out = m.from === me;
   return `<div class="message${out ? " outgoing" : ""}${!out && !m.isRead ? " unread" : ""}">
     <div class="message-meta">${out ? "Кому: " + esc(nameOf(m.to)) : "От: " + esc(nameOf(m.from))}, ${esc(fmtDate(m.date))}</div>
-    <div class="message-text">${esc(m.text)}</div>
+    <div class="message-text">${esc(m.text)}</div>${extra}
   </div>`;
 }

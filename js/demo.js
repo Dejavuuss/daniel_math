@@ -4,6 +4,7 @@
 import { COLLECTIONS, emptyDataset, publicUser } from "./auth.js";
 
 const DB_KEY = "tutor_demo_db";
+const FILE_KEY = "tutor_demo_file_";
 
 function seed() {
   const d = (offset) => {
@@ -69,6 +70,7 @@ function seed() {
       { from:"ivan", to:"teacher", text:"Понял, там дискриминант равен нулю!", date:d(-1), isRead:true },
       { from:"teacher", to:"parent_ivan", text:"Алексей, Иван заметно прибавил в алгебре. На этой неделе добавим геометрию.", date:d(-3), isRead:false }
     ]),
+    files:[],
     topics:rec([
       { subject:"Алгебра", title:"Квадратные уравнения", description:"Дискриминант, теорема Виета." },
       { subject:"Геометрия", title:"Подобие треугольников", description:"" }
@@ -77,7 +79,10 @@ function seed() {
 }
 
 function read() {
-  try { const raw = localStorage.getItem(DB_KEY); if (raw) return JSON.parse(raw); } catch (_) {}
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) { const db = JSON.parse(raw); db.files = db.files || []; return db; }
+  } catch (_) {}
   const db = seed(); write(db); return db;
 }
 function write(db) { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (_) {} }
@@ -102,6 +107,7 @@ export function createDemoBackend() {
       if (user.role === "admin") {
         COLLECTIONS.forEach(c => { data[c] = db[c].slice(); });
         data.users = db.users.map(publicUser);
+        data.files = db.files.slice();
         return data;
       }
       const me = db.users.find(u => u.username === user.username);
@@ -116,7 +122,9 @@ export function createDemoBackend() {
         homework:mine("homework"), grades:mine("grades"), lessonNotes:mine("lessonNotes"), payments:mine("payments"), achievements:mine("achievements"),
         schedule:db.schedule.filter(e => !e.student || e.student === student),
         messages:db.messages.filter(m => party.includes(m.from) || party.includes(m.to)),
-        topics:db.topics.slice()
+        topics:db.topics.slice(),
+        files:db.files.filter(f => f.kind === "material" || (f.kind === "homework" && f.student === student) ||
+          (f.kind === "message" && (party.includes(f.from) || party.includes(f.to))))
       });
     },
 
@@ -136,6 +144,33 @@ export function createDemoBackend() {
     async remove(name, id) {
       await wait();
       const db = read(); db[name] = db[name].filter(r => r.id !== id); write(db);
+    },
+
+    // Содержимое файлов в демо-режиме — в localStorage браузера (несколько мегабайт на всё).
+    async putFile(meta, chunks) {
+      await wait();
+      const id = "demofile" + Date.now() + Math.random().toString(36).slice(2, 6);
+      const bin = chunks.map(c => { let t = ""; c.forEach(x => { t += String.fromCharCode(x); }); return btoa(t); });
+      try { localStorage.setItem(FILE_KEY + id, JSON.stringify(bin)); }
+      catch (_) { throw new Error("В демо-режиме не хватает места в браузере для этого файла."); }
+      const db = read(); db.files.push(Object.assign({ id }, meta)); write(db);
+      return id;
+    },
+
+    async getFile(id) {
+      const raw = localStorage.getItem(FILE_KEY + id);
+      if (!raw) throw new Error("Файл не найден.");
+      return JSON.parse(raw).map(b => Uint8Array.from(atob(b), ch => ch.charCodeAt(0)));
+    },
+
+    async filesOf(kind, parentId) {
+      return read().files.filter(f => f.kind === kind && f.parentId === parentId);
+    },
+
+    async removeFiles(list) {
+      const db = read(), ids = list.map(f => f.id);
+      ids.forEach(id => { try { localStorage.removeItem(FILE_KEY + id); } catch (_) {} });
+      db.files = db.files.filter(f => !ids.includes(f.id)); write(db);
     },
 
     async markRead(user) {

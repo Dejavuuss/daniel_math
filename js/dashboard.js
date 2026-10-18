@@ -3,6 +3,7 @@ import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { mountArt, QUOTES } from "./art.js";
 import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml } from "./ui.js";
 import { renderCalendar } from "./calendar.js";
+import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
 
 const currentUser = requireAuth();
 if (currentUser && currentUser.role === "parent") location.replace("parent.html");
@@ -19,6 +20,11 @@ if (currentUser) {
 }
 
 const isMine = h => currentUser.role === "admin" || h.student === currentUser.username;
+// Свои загрузки ученик может удалить; у решений — подпись, чтобы отличать от условия задания.
+const filesHtml = (kind, id) => attachmentsHtml(filesFor(state.files, kind, id), {
+    canDelete:f => f.owner === currentUser.username,
+    note:f => kind === "homework" && f.owner === currentUser.username ? "твоё решение" : ""
+});
 const nameOf = u => (state.users.find(x => x.username === u) || {}).name || u;
 
 async function loadData() {
@@ -83,7 +89,7 @@ async function renderMessages() {
     badge.textContent = unread;
     badge.hidden = unread === 0;
     if (!mine.length) { box.innerHTML = '<p class="muted small">Сообщений пока нет.</p>'; return; }
-    box.innerHTML = mine.slice().reverse().map(m => messageHtml(m, currentUser.username, nameOf)).join("");
+    box.innerHTML = mine.slice().reverse().map(m => messageHtml(m, currentUser.username, nameOf, filesHtml("message", m.id))).join("");
     if (unread > 0) {
         try { await apiPost({ action:"markMessagesRead" }); } catch (_) {}
     }
@@ -103,6 +109,7 @@ function renderMaterials() {
         ${m.topic ? `<p class="muted small">${esc(m.topic)}</p>` : ""}
         ${m.description ? `<p class="muted">${esc(m.description)}</p>` : ""}
         ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer" class="resource-link">Открыть материал</a>` : ""}
+        ${filesHtml("material", m.id)}
     </article>`).join("") : '<p class="muted">Материалов пока нет.</p>';
 }
 
@@ -118,8 +125,9 @@ function renderHomework() {
             ${h.comment ? `<p class="muted small">${esc(h.comment)}</p>` : ""}
             <p class="muted small">Выдано ${esc(fmtDate(h.assigned))}, сдать до ${esc(fmtDate(h.due))}</p>
             ${h.link ? `<a class="resource-link" href="${esc(h.link)}" target="_blank" rel="noopener noreferrer">Открыть материал</a>` : ""}
+            ${filesHtml("homework", h.id)}
             ${currentUser.role !== "admin"
-                ? `<div><button class="${done ? "" : "primary"}" data-homework="${esc(h.id)}" data-status="${done ? "pending" : "done"}">${done ? "Снять отметку" : "Отметить выполненным"}</button></div>`
+                ? `<div class="hw-actions"><button class="${done ? "" : "primary"}" data-homework="${esc(h.id)}" data-status="${done ? "pending" : "done"}">${done ? "Снять отметку" : "Отметить выполненным"}</button>${solutionButtonHtml(h.id)}</div>`
                 : `<p class="muted small">Ученик: ${esc(h.student)}</p>`}
         </article>`;
     }).join("") : '<p class="muted">Домашних заданий пока нет.</p>';
@@ -137,5 +145,8 @@ function renderHomework() {
         }
     });
 }
+
+["materials", "homework", "messagesList"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));
+if (currentUser) bindSolutionUploads(document.getElementById("homework"), currentUser.username, loadData);
 
 if (currentUser && currentUser.role !== "parent") loadData();

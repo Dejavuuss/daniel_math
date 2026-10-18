@@ -386,6 +386,53 @@ tbody tr:last-child td{border-bottom:0}
 @keyframes toastOut{to{opacity:0;transform:translateX(30px)}}
 @keyframes toastTimer{to{transform:scaleX(0)}}
 
+/* ---------- Прикреплённые файлы ---------- */
+.attach{margin-top:16px}
+.attach-drop{display:flex;align-items:center;gap:14px;margin:0;padding:14px 16px;border:1px dashed var(--line);border-radius:var(--r);cursor:pointer;color:var(--muted);font-weight:400;
+    transition:border-color .35s var(--ease),background-color .35s var(--ease),color .35s var(--ease)}
+.attach-drop:hover,.attach-drop.over{border-color:var(--gold);color:var(--text);background:color-mix(in srgb,var(--gold) 6%,transparent)}
+.attach-drop input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.attach-drop:focus-within{outline:2px solid var(--gold);outline-offset:3px}
+.attach-drop svg{flex:none;width:22px;height:22px;color:var(--gold)}
+.attach-drop b{display:block;font-weight:600;color:var(--text);font-size:.88rem}
+.attach-drop small{display:block;font-size:.76rem;color:var(--faint);margin-top:2px}
+.attach-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.attach-list li{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--line-soft);border-radius:var(--r);background:color-mix(in srgb,var(--wall) 40%,transparent);animation:panelIn .4s var(--ease) both}
+.attach-list img{width:36px;height:36px;object-fit:cover;border-radius:2px}
+.att-ext{flex:none;display:grid;place-items:center;min-width:36px;height:36px;padding:0 4px;border:1px solid color-mix(in srgb,var(--gold) 50%,transparent);border-radius:2px;font:700 .64rem/1 var(--sans);color:var(--gold);letter-spacing:.04em}
+.att-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
+.att-size{flex:none;font-size:.74rem;color:var(--faint)}
+button.att-del{flex:none;width:28px;min-height:28px;padding:0;font-size:.72rem;color:var(--faint);border-color:transparent}
+button.att-del:hover{color:var(--vermilion);border-color:color-mix(in srgb,var(--vermilion) 50%,transparent)}
+.attachments{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin:10px 0 4px}
+.att-item{position:relative;display:flex;flex-direction:column;gap:4px;max-width:100%}
+.att-item .att-del{position:absolute;top:4px;right:4px;background:color-mix(in srgb,var(--wall) 85%,transparent)}
+.att-item:not(.is-img) .att-del{position:static;align-self:flex-end}
+.att-item:not(.is-img){flex-direction:row;align-items:center}
+button.att-img{padding:0;border-radius:var(--r);overflow:hidden;width:112px;height:112px;border-color:var(--line-soft)}
+button.att-img img{width:100%;height:100%;object-fit:cover;transition:transform .6s var(--ease)}
+button.att-img:hover img{transform:scale(1.06)}
+button.att-file{gap:10px;justify-content:flex-start;max-width:320px;padding:6px 12px 6px 6px;border-radius:var(--r);font-weight:500;text-align:left}
+button.att-file.loading{opacity:.6;cursor:progress}
+.att-note{font-size:.7rem;color:var(--verdigris)}
+td .attachments{margin:0}
+td button.att-img{width:56px;height:56px}
+td button.att-file{max-width:200px}
+.attach-solution{margin-top:10px;cursor:pointer}
+.attach-solution input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.attach-solution:focus-within{outline:2px solid var(--gold);outline-offset:3px}
+.attach-solution svg{width:16px;height:16px;color:var(--gold)}
+.attach-solution.busy{opacity:.6;pointer-events:none}
+.hw-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hw-actions button,.hw-actions .attach-solution{margin-top:10px}
+.viewer{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;padding:24px;background:rgba(10,8,6,.86);backdrop-filter:blur(6px);animation:pageIn .35s var(--ease) both}
+.viewer figure{margin:0;max-width:min(1100px,100%);max-height:100%;display:flex;flex-direction:column;gap:10px}
+.viewer img{max-width:100%;max-height:calc(100vh - 120px);object-fit:contain;border:1px solid color-mix(in srgb,var(--gold) 40%,transparent);background:var(--panel);transition:filter .5s var(--ease)}
+.viewer img.blur{filter:blur(8px)}
+.viewer figcaption{display:flex;align-items:center;gap:10px;color:#ece3d1;font-size:.85rem}
+.viewer figcaption span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viewer figcaption button{color:#ece3d1;border-color:rgba(236,227,209,.35)}
+
 /* ---------- Смотритель (чат-ассистент) ---------- */
 .assistant{position:fixed;right:20px;bottom:20px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
 .assistant-toggle{gap:10px;padding:0 20px 0 16px;min-height:52px;background:color-mix(in srgb,var(--wall) 82%,transparent);border-color:color-mix(in srgb,var(--gold) 70%,transparent);color:var(--gold);

@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
 import {
-  collection, doc, getDoc, getDocs, query, where, addDoc, setDoc, updateDoc, deleteDoc, writeBatch, setLogLevel
+  collection, doc, getDoc, getDocs, query, where, addDoc, setDoc, updateDoc, deleteDoc, writeBatch, setLogLevel, Bytes
 } from "firebase/firestore";
 
 setLogLevel("silent"); // отказы в тестах-атаках ожидаемы, не засоряем ими вывод
@@ -20,6 +20,15 @@ const USERS = {
 };
 const hw = (student, extra = {}) => Object.assign({ student, title:"№ 412", assigned:"2026-10-10", due:"2026-10-17", status:"pending", link:"", comment:"" }, extra);
 const msg = (from, to, extra = {}) => Object.assign({ from, to, text:"Привет", date:"2026-10-15", isRead:false }, extra);
+const fileMeta = (owner, kind, parentId, extra = {}) => Object.assign({ name:"фото.jpg", type:"image/jpeg", size:3, chunks:1, thumb:"", kind, parentId, owner, student:"", from:"", to:"", date:"2026-10-18" }, extra);
+const bytes = n => Bytes.fromUint8Array(new Uint8Array(n));
+// Загрузка файла так же, как в js/auth.js: метаданные и куски одним пакетом.
+async function upload(db, id, meta, chunkSizes = [3]) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "files", id), meta);
+  chunkSizes.forEach((n, i) => batch.set(doc(db, "files", id, "chunks", String(i)), { data:bytes(n) }));
+  return batch.commit();
+}
 
 // Firestore от имени пользователя с тем же токеном, что выдаёт Firebase Auth.
 const as = name => env.authenticatedContext(USERS[name].uid, { email:`${name}@${DOMAIN}` }).firestore();
@@ -212,4 +221,71 @@ test("репетитор создаёт учеников и родителей, 
   await assertFails(setDoc(doc(db, "users", "other"), { username:"another", uid:"u-o", name:"Не тот id", role:"student", grade:8, child:"" }));
   await assertFails(updateDoc(doc(db, "users", "ivan"), { uid:"u-stolen" }));
   await assertFails(deleteDoc(doc(db, "users", "teacher")));
+});
+
+/* ---------- Прикреплённые файлы ---------- */
+
+test("файлы материалов: репетитор прикрепляет, все участники читают", async () => {
+  await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "materials", "m1"), { title:"Конспект", grade:9, url:"", description:"", topic:"", type:"material" }); });
+  const t = as("teacher");
+  await assertSucceeds(upload(t, "f-mat", fileMeta("teacher", "material", "m1", { chunks:2, size:6 }), [3, 3]));
+  const i = as("ivan");
+  await assertSucceeds(getDocs(query(collection(i, "files"), where("kind", "==", "material"))));
+  await assertSucceeds(getDoc(doc(i, "files", "f-mat", "chunks", "1")));
+  await assertFails(upload(i, "f-mat2", fileMeta("ivan", "material", "m1")));
+  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), "files")));
+});
+
+test("решение ДЗ: ученик и его родитель прикрепляют, чужое — нет", async () => {
+  const i = as("ivan");
+  await assertSucceeds(upload(i, "f-sol", fileMeta("ivan", "homework", "h-ivan", { student:"ivan" })));
+  await assertSucceeds(upload(as("parent_ivan"), "f-sol2", fileMeta("parent_ivan", "homework", "h-ivan", { student:"ivan" })));
+  await assertFails(upload(i, "f-x1", fileMeta("ivan", "homework", "h-anna", { student:"anna" })));
+  await assertFails(upload(i, "f-x2", fileMeta("ivan", "homework", "h-anna", { student:"ivan" })));
+  await assertFails(upload(i, "f-x3", fileMeta("teacher", "homework", "h-ivan", { student:"ivan" })));
+  await assertFails(upload(i, "f-x4", fileMeta("ivan", "homework", "нет-такого", { student:"ivan" })));
+  await assertSucceeds(upload(as("teacher"), "f-task", fileMeta("teacher", "homework", "h-anna", { student:"anna" })));
+});
+
+test("файлы ДЗ видны только своему ученику, родителю и репетитору", async () => {
+  await upload(as("teacher"), "f-anna", fileMeta("teacher", "homework", "h-anna", { student:"anna" }));
+  await upload(as("teacher"), "f-ivan", fileMeta("teacher", "homework", "h-ivan", { student:"ivan" }));
+  const i = as("ivan");
+  await assertSucceeds(getDocs(query(collection(i, "files"), where("kind", "==", "homework"), where("student", "==", "ivan"))));
+  await assertSucceeds(getDoc(doc(i, "files", "f-ivan", "chunks", "0")));
+  await assertFails(getDoc(doc(i, "files", "f-anna")));
+  await assertFails(getDoc(doc(i, "files", "f-anna", "chunks", "0")));
+  await assertFails(getDocs(query(collection(i, "files"), where("kind", "==", "homework"))));
+  const p = as("parent_ivan");
+  await assertSucceeds(getDocs(query(collection(p, "files"), where("kind", "==", "homework"), where("student", "==", "ivan"))));
+  await assertFails(getDoc(doc(p, "files", "f-anna", "chunks", "0")));
+  await assertSucceeds(getDocs(collection(as("teacher"), "files")));
+});
+
+test("файлы сообщений: прикрепляет только отправитель, видят участники", async () => {
+  const t = as("teacher");
+  await assertSucceeds(upload(t, "f-msg", fileMeta("teacher", "message", "to-ivan", { from:"teacher", to:"ivan" })));
+  await assertFails(upload(as("ivan"), "f-msg2", fileMeta("ivan", "message", "to-ivan", { from:"teacher", to:"ivan" })));
+  await assertFails(upload(t, "f-msg3", fileMeta("teacher", "message", "to-ivan", { from:"teacher", to:"anna" })));
+  await assertSucceeds(upload(as("ivan"), "f-msg4", fileMeta("ivan", "message", "from-ivan", { from:"ivan", to:"teacher" })));
+  await assertSucceeds(getDocs(query(collection(as("ivan"), "files"), where("kind", "==", "message"), where("to", "in", ["ivan"]))));
+  await assertSucceeds(getDocs(query(collection(as("parent_ivan"), "files"), where("kind", "==", "message"), where("from", "in", ["parent_ivan", "ivan"]))));
+  await assertSucceeds(getDoc(doc(as("parent_ivan"), "files", "f-msg", "chunks", "0")));
+  await assertFails(getDoc(doc(as("anna"), "files", "f-msg")));
+});
+
+test("файлы: размеры, лишние куски, подмена и изменение запрещены", async () => {
+  const i = as("ivan"), m = fileMeta("ivan", "homework", "h-ivan", { student:"ivan" });
+  await assertFails(upload(i, "f-big", m, [950001]));
+  await assertFails(upload(i, "f-extra", m, [3, 3]));
+  await assertFails(upload(i, "f-huge", Object.assign({}, m, { size:6000000 })));
+  await assertFails(upload(i, "f-thumb", Object.assign({}, m, { thumb:"javascript:alert(1)" })));
+  await assertFails(upload(i, "f-field", Object.assign({}, m, { hacked:true })));
+  await assertSucceeds(upload(i, "f-ok", m));
+  await assertFails(updateDoc(doc(i, "files", "f-ok"), { name:"другое.jpg" }));
+  await assertFails(setDoc(doc(as("anna"), "files", "f-ok", "chunks", "0"), { data:bytes(3) }));
+  await assertFails(deleteDoc(doc(as("parent_ivan"), "files", "f-ok")));
+  const b = writeBatch(i);
+  b.delete(doc(i, "files", "f-ok", "chunks", "0")); b.delete(doc(i, "files", "f-ok"));
+  await assertSucceeds(b.commit());
 });
