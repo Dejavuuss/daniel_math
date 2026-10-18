@@ -1,4 +1,4 @@
-// «Смотритель» — чат-ассистент для всех посетителей. Говорит с Cloud Function (functions/index.js),
+// ИИ-ассистент — чат для всех посетителей. Говорит с Cloud Function (functions/index.js),
 // которая хранит ключ OpenRouter API и лимиты. Диалог живёт в sessionStorage вкладки, чтобы не теряться
 // при переходе между страницами; на сервер уходят последние реплики (сервер обрезает историю сам).
 import { ASSISTANT_URL } from "./firebase-config.js";
@@ -6,7 +6,7 @@ import { reduceMotion } from "./fx.js";
 
 const STORE_KEY = "tutor_assistant";
 const HISTORY_LIMIT = 12;
-const GREETING = "Здравствуйте! Я Смотритель, помощник сайта «Уроки с Даниилом». Спросите о чём угодно: о занятиях и записи, о задаче, которая не даётся, или о любом другом предмете.";
+const GREETING = "Здравствуйте! Я ИИ-ассистент сайта «Уроки с Даниилом». Спросите о чём угодно: о занятиях и записи, о задаче, которая не даётся, или о любом другом предмете.";
 const SUGGESTIONS = ["Сколько стоит занятие?", "Помогите с задачей", "Объясните тему по физике"];
 
 export function mountAssistant() {
@@ -17,10 +17,10 @@ export function mountAssistant() {
   const root = document.createElement("div");
   root.className = "assistant";
   root.innerHTML = `
-    <section class="assistant-panel" id="assistantPanel" role="dialog" aria-label="Смотритель — ассистент сайта" hidden>
+    <section class="assistant-panel" id="assistantPanel" role="dialog" aria-label="ИИ-ассистент сайта" hidden>
       <header class="assistant-head">
         <div class="seal" aria-hidden="true">?</div>
-        <div><strong>Смотритель</strong><span>Отвечает ИИ — может ошибаться</span></div>
+        <div><strong>ИИ-ассистент</strong><span>Отвечает ИИ — может ошибаться</span></div>
         <button class="icon-btn assistant-close" type="button" aria-label="Закрыть чат">✕</button>
       </header>
       <div class="assistant-log" role="log" aria-live="polite"></div>
@@ -32,7 +32,7 @@ export function mountAssistant() {
     </section>
     <button class="assistant-toggle" type="button" aria-expanded="false" aria-controls="assistantPanel">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8.5" cy="11" r="1" fill="currentColor"/><circle cx="12" cy="11" r="1" fill="currentColor"/><circle cx="15.5" cy="11" r="1" fill="currentColor"/></svg>
-      <span>Смотритель</span>
+      <span>ИИ-ассистент</span>
     </button>`;
   document.body.appendChild(root);
   document.body.classList.add("has-assistant");
@@ -86,7 +86,7 @@ export function mountAssistant() {
     history.push({ role:"user", content:text });
     bubble("user", text);
     const typing = bubble("assistant", "", " typing");
-    typing.setAttribute("aria-label", "Смотритель печатает");
+    typing.setAttribute("aria-label", "ИИ-ассистент печатает");
     try {
       const res = await fetch(ASSISTANT_URL, {
         method:"POST",

@@ -1,4 +1,4 @@
-# Cloudflare Worker ассистента «Смотритель». Деплой: npx wrangler deploy (из папки worker).
+# Cloudflare Worker ИИ-ассистента сайта. Деплой: npx wrangler deploy (из папки worker).
 name = "math-assistant"
 main = "src/index.js"
 compatibility_date = "2026-09-25"
