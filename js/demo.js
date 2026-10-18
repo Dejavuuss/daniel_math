@@ -71,6 +71,24 @@ function seed() {
       { from:"teacher", to:"parent_ivan", text:"Алексей, Иван заметно прибавил в алгебре. На этой неделе добавим геометрию.", date:d(-3), isRead:false }
     ]),
     files:[],
+    tests:[{ id:"demotest1", title:"Квадратные уравнения: разминка", topic:"Уравнения", grade:9, student:"", description:"Пять вопросов, минут на десять.", date:d(-1),
+      questions:[
+        { text:"Сколько корней у уравнения $x^2 - 4x + 4 = 0$?", type:"choice", options:["Ни одного", "Один", "Два"] },
+        { text:"Найдите дискриминант уравнения $x^2 - 5x + 6 = 0$.", type:"number", options:[] },
+        { text:"Чему равна сумма корней уравнения $x^2 - 7x + 10 = 0$?", type:"number", options:[] },
+        { text:"Решите уравнение $2x^2 = 8$. Укажите положительный корень.", type:"number", options:[] },
+        { text:"Как называется теорема о сумме и произведении корней?", type:"text", options:[] }
+      ] }],
+    testKeys:{ demotest1:["1", "1", "7", "2", "Виета; теорема Виета"] },
+    testResults:[],
+    problems:rec([
+      { topic:"Дроби", grade:null, difficulty:1, text:"Вычислите $\frac{1}{2} + \frac{1}{3}$.", answer:"5/6", solution:"Общий знаменатель 6: $\frac{3}{6} + \frac{2}{6} = \frac{5}{6}$." },
+      { topic:"Дроби", grade:null, difficulty:2, text:"Вычислите $\frac{3}{4} \cdot \frac{8}{9}$.", answer:"2/3", solution:"$\frac{3 \cdot 8}{4 \cdot 9} = \frac{24}{36} = \frac{2}{3}$." },
+      { topic:"Уравнения", grade:9, difficulty:1, text:"Решите уравнение $3x - 7 = 11$.", answer:"6", solution:"$3x = 18$, $x = 6$." },
+      { topic:"Уравнения", grade:9, difficulty:2, text:"Найдите корни уравнения $x^2 - 9 = 0$.", answer:"3; -3", solution:"$x^2 = 9$, значит $x = \pm 3$." },
+      { topic:"Геометрия", grade:8, difficulty:2, text:"Катеты прямоугольного треугольника равны 6 и 8. Найдите гипотенузу.", answer:"10", solution:"По теореме Пифагора $c = \sqrt{6^2 + 8^2} = \sqrt{100} = 10$." },
+      { topic:"Геометрия", grade:8, difficulty:3, text:"Площадь квадрата равна 50. Найдите его диагональ.", answer:"10", solution:"$d = a\sqrt{2}$, $a^2 = 50$, значит $d^2 = 2a^2 = 100$ и $d = 10$." }
+    ]),
     topics:rec([
       { subject:"Алгебра", title:"Квадратные уравнения", description:"Дискриминант, теорема Виета." },
       { subject:"Геометрия", title:"Подобие треугольников", description:"" }
@@ -81,7 +99,13 @@ function seed() {
 function read() {
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if (raw) { const db = JSON.parse(raw); db.files = db.files || []; return db; }
+    if (raw) {
+      const db = JSON.parse(raw), fresh = seed();
+      // Демо-данные из старой версии сайта: добавляем недостающие коллекции.
+      for (const k of ["files", "tests", "testResults", "problems"]) db[k] = db[k] || fresh[k];
+      db.testKeys = db.testKeys || fresh.testKeys;
+      return db;
+    }
   } catch (_) {}
   const db = seed(); write(db); return db;
 }
@@ -108,6 +132,7 @@ export function createDemoBackend() {
         COLLECTIONS.forEach(c => { data[c] = db[c].slice(); });
         data.users = db.users.map(publicUser);
         data.files = db.files.slice();
+        data.testKeys = Object.assign({}, db.testKeys);
         return data;
       }
       const me = db.users.find(u => u.username === user.username);
@@ -123,6 +148,10 @@ export function createDemoBackend() {
         schedule:db.schedule.filter(e => !e.student || e.student === student),
         messages:db.messages.filter(m => party.includes(m.from) || party.includes(m.to)),
         topics:db.topics.slice(),
+        tests:db.tests.filter(t => !t.student || t.student === student),
+        testResults:db.testResults.filter(r => r.student === student),
+        problems:db.problems.slice(),
+        testKeys:Object.fromEntries(db.testResults.filter(r => r.student === student).map(r => [r.testId, db.testKeys[r.testId]])),
         files:db.files.filter(f => f.kind === "material" || (f.kind === "homework" && f.student === student) ||
           (f.kind === "message" && (party.includes(f.from) || party.includes(f.to))))
       });
@@ -161,6 +190,28 @@ export function createDemoBackend() {
       const raw = localStorage.getItem(FILE_KEY + id);
       if (!raw) throw new Error("Файл не найден.");
       return JSON.parse(raw).map(b => Uint8Array.from(atob(b), ch => ch.charCodeAt(0)));
+    },
+
+    async addTest(test, answers) {
+      await wait();
+      const db = read(), id = "demotest" + Date.now();
+      db.tests.push(Object.assign({ id }, test)); db.testKeys[id] = answers; write(db);
+      return id;
+    },
+
+    async removeTest(id) {
+      const db = read();
+      db.tests = db.tests.filter(t => t.id !== id);
+      db.testResults = db.testResults.filter(r => r.testId !== id);
+      delete db.testKeys[id]; write(db);
+    },
+
+    async submitTest(r) {
+      await wait();
+      const db = read(), id = `${r.testId}_${r.student}`;
+      if (db.testResults.some(x => x.id === id)) throw new Error("Этот тест уже сдан.");
+      db.testResults.push(Object.assign({ id }, r)); write(db);
+      return db.testKeys[r.testId] || null;
     },
 
     async filesOf(kind, parentId) {

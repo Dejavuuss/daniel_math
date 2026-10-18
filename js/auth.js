@@ -3,13 +3,14 @@
 // apiGet() возвращает весь доступный роли набор данных, apiPost({action, ...}) выполняет одно действие.
 // Права проверяются на сервере правилами firestore.rules; проверки здесь — только для понятных сообщений об ошибках.
 import { firebaseConfig, USERNAME_DOMAIN } from "./firebase-config.js";
+import { parseNumber } from "./quiz.js";
 
 const SDK = "https://www.gstatic.com/firebasejs/12.19.0/";
 const USER_KEY = "tutor_user";
 const THEME_KEY = "tutor_theme";
 export const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR_");
 
-export const COLLECTIONS = ["users","materials","homework","schedule","grades","lessonNotes","payments","achievements","messages","topics"];
+export const COLLECTIONS = ["users","materials","homework","schedule","grades","lessonNotes","payments","achievements","messages","topics","tests","testResults","problems"];
 const DELETABLE = COLLECTIONS.filter(c => c !== "users");
 const SUBJECTS = ["Математика","Алгебра","Геометрия"];
 // Прикреплённые файлы хранятся в Firestore кусками (Firebase Storage требует платный тариф).
@@ -107,6 +108,10 @@ const ADMIN_RECORDS = {
     student:required(p.student,"Ученик",40), title:required(p.title,"Название",120), description:text(p.description,500),
     date:date(p.date,"Дата"), icon:text(p.icon || "🏆",16)
   }],
+  addProblem: p => ["problems", {
+    topic:required(p.topic,"Тема",200), grade:optionalInt(p.grade,1,11,"Класс"), difficulty:int(p.difficulty || 1,1,3,"Сложность: от 1 до 3."),
+    text:required(p.text,"Условие",4000), answer:required(p.answer,"Ответ",300), solution:text(p.solution,4000)
+  }],
   addTopic: p => ["topics", {
     subject:oneOf(p.subject,SUBJECTS,"Предмет"), title:required(p.title,"Название",200), description:text(p.description,2000)
   }]
@@ -142,8 +147,49 @@ async function dispatch(b, user, p) {
       const name = String(p.sheet || ""), id = String(p.id == null ? "" : p.id);
       if (!DELETABLE.includes(name) || !id) throw new Error("Некорректная запись для удаления.");
       if (FILE_KIND[name]) await b.removeFiles(await b.filesOf(FILE_KIND[name], id));
-      await b.remove(name, id);
+      if (name === "tests") await b.removeTest(id);
+      else await b.remove(name, id);
       return { ok:true };
+    }
+    // Тест: вопросы видны ученику сразу, ответы (answers) — отдельным документом, только после сдачи.
+    case "addTest": {
+      needAdmin();
+      const qs = Array.isArray(p.questions) ? p.questions : [];
+      if (!qs.length || qs.length > 30) throw new Error("В тесте должно быть от 1 до 30 вопросов.");
+      const questions = [], answers = [];
+      qs.forEach((q, i) => {
+        const n = `Вопрос ${i + 1}`;
+        const type = oneOf(q.type, ["choice","number","text"], `${n}: тип`);
+        const textValue = required(q.text, `${n}: текст`, 2000);
+        let options = [], answer;
+        if (type === "choice") {
+          options = (Array.isArray(q.options) ? q.options : []).map(o => String(o == null ? "" : o).trim()).filter(Boolean);
+          if (options.length < 2 || options.length > 6) throw new Error(`${n}: нужно от 2 до 6 вариантов ответа.`);
+          if (options.some(o => o.length > 300)) throw new Error(`${n}: вариант длиннее 300 символов.`);
+          if (q.answer === "" || q.answer == null) throw new Error(`${n}: отметьте правильный вариант.`);
+          answer = String(int(q.answer, 0, options.length - 1, `${n}: отметьте правильный вариант.`));
+        } else {
+          answer = required(q.answer, `${n}: правильный ответ`, 300);
+          if (type === "number" && answer.split(";").some(a => a.trim() && !Number.isFinite(parseNumber(a)))) {
+            throw new Error(`${n}: ответ должен быть числом, например 0,5 или 1/2.`);
+          }
+        }
+        questions.push({ text:textValue, type, options });
+        answers.push(answer);
+      });
+      const test = {
+        title:required(p.title,"Название",200), topic:text(p.topic,200), grade:optionalInt(p.grade,1,11,"Класс"),
+        student:text(p.student,40), description:text(p.description,2000), date:today(), questions
+      };
+      const id = await b.addTest(test, answers);
+      return { ok:true, item:Object.assign({ id }, test) };
+    }
+    case "submitTest": {
+      if (user.role !== "student") throw new Error("Тест сдаёт сам ученик.");
+      const testId = required(p.testId, "Тест", 64);
+      const answers = (Array.isArray(p.answers) ? p.answers : []).map(a => text(a, 500));
+      const key = await b.submitTest({ testId, student:user.username, answers, date:today() });
+      return { ok:true, key };
     }
     // p.files — подготовленные js/files.js объекты {name, type, data:Uint8Array, thumb}.
     case "attachFiles": {
@@ -278,7 +324,7 @@ function humanError(e) {
 /* ---------- Бэкенды ---------- */
 
 export function emptyDataset() {
-  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[] };
+  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], testKeys:{} };
 }
 export function publicUser(u) {
   return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || "") };
@@ -328,9 +374,10 @@ async function createFirebaseBackend() {
       await signedIn();
       const data = emptyDataset();
       if (user.role === "admin") {
-        const names = [...COLLECTIONS, "files"];
+        const names = [...COLLECTIONS, "files", "testKeys"];
         const lists = await Promise.all(names.map(c => rows(col(c))));
         names.forEach((c, i) => { data[c] = lists[i]; });
+        data.testKeys = Object.fromEntries(data.testKeys.map(k => [k.id, k.answers]));
         data.users = data.users.map(publicUser);
         return data;
       }
@@ -359,6 +406,17 @@ async function createFirebaseBackend() {
       ]);
       const files = new Map();
       fileLists.flat().forEach(f => files.set(f.id, f));
+      // Тесты: общие и свои; результаты своего ученика; ключи — только к уже сданным тестам.
+      const [tests, testResults, problems] = await Promise.all([
+        rows(F.query(col("tests"), student ? F.where("student","in",["", student]) : F.where("student","==",""))),
+        student ? rows(F.query(col("testResults"), F.where("student","==",student))) : Promise.resolve([]),
+        rows(col("problems"))
+      ]);
+      const testKeys = {};
+      await Promise.all(testResults.map(async r => {
+        const k = await F.getDoc(F.doc(db, "testKeys", r.testId)).catch(() => null);
+        if (k && k.exists()) testKeys[r.testId] = k.data().answers;
+      }));
       const messages = new Map();
       [...sent, ...received].forEach(m => messages.set(m.id, m));
       Object.assign(data, {
@@ -366,7 +424,8 @@ async function createFirebaseBackend() {
         materials:materials.filter(m => m.grade == null || m.grade === "" || !child || String(m.grade) === String(child.grade)),
         homework, schedule, grades, lessonNotes, payments, achievements, topics,
         messages:[...messages.values()].sort(byDate),
-        files:[...files.values()]
+        files:[...files.values()],
+        tests, testResults, problems, testKeys
       });
       return data;
     },
@@ -392,6 +451,31 @@ async function createFirebaseBackend() {
         if (!snap.exists()) throw new Error("Файл повреждён или удалён.");
         return snap.data().data.toUint8Array();
       });
+    },
+    async addTest(test, answers) {
+      await signedIn();
+      const ref = F.doc(col("tests"));
+      const batch = F.writeBatch(db);
+      batch.set(ref, test);
+      batch.set(F.doc(db, "testKeys", ref.id), { answers });
+      await batch.commit();
+      return ref.id;
+    },
+    async removeTest(id) {
+      await signedIn();
+      const results = await F.getDocs(F.query(col("testResults"), F.where("testId","==",id)));
+      const batch = F.writeBatch(db);
+      results.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(F.doc(db, "testKeys", id));
+      batch.delete(F.doc(db, "tests", id));
+      await batch.commit();
+    },
+    // Ответы сохраняются навсегда; ключ правила отдают только после этого.
+    async submitTest(r) {
+      await signedIn();
+      await F.setDoc(F.doc(db, "testResults", `${r.testId}_${r.student}`), r);
+      const k = await F.getDoc(F.doc(db, "testKeys", r.testId));
+      return k.exists() ? k.data().answers : null;
     },
     async filesOf(kind, parentId) {
       await signedIn();

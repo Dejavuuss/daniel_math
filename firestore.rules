@@ -31,6 +31,13 @@ rules_version = '2';
 //                           Для material student/from/to пустые; для homework student = ученик задания;
 //                           для message from/to = отправитель/получатель сообщения. Неизменяем после создания.
 // files/{id}/chunks/{n}     кусок содержимого файла: data — bytes ≤ 950000; n = 0..chunks-1
+// tests/{id}                тест: title 1..200, topic ≤200, grade int 1..11 | null, student ('' — для всех),
+//                           description ≤2000, date, questions — список 1..30 вопросов {text, type, options}
+// testKeys/{testId}         правильные ответы теста: answers — список строк; ученик видит ключ только ПОСЛЕ сдачи
+// testResults/{testId}_{student}  ответы ученика: testId, student, answers (список), date; неизменяемы.
+//                           Балл не хранится — считается из ответов и ключа, поэтому подделать его нельзя.
+// problems/{id}             банк задач: topic 1..200, grade int 1..11 | null, difficulty int 1..3,
+//                           text 1..4000, answer 1..300, solution ≤4000 (ответы открыты — это тренировка)
 //
 // Доступ:
 //   admin   — читает и пишет всё (кроме создания других админов).
@@ -285,6 +292,68 @@ service cloud.firestore {
         allow create: if isValidChunk(fileId, n);
         allow delete: if isAdmin() || (isMember() && get(filePath(fileId)).data.owner == myUsername());
       }
+    }
+
+    // ---------- Тесты и банк задач ----------
+    function testPath(id) {
+      return /databases/$(database)/documents/tests/$(id);
+    }
+    function resultPath(id) {
+      return /databases/$(database)/documents/testResults/$(id);
+    }
+    function isValidTest(d) {
+      return hasExactly(d, ['title', 'topic', 'grade', 'student', 'description', 'date', 'questions']) &&
+        str(d.title, 1, 200) && str(d.topic, 0, 200) && optGrade(d.grade) &&
+        (d.student == '' || login(d.student)) && str(d.description, 0, 2000) && day(d.date) &&
+        d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 30;
+    }
+    function isValidResult(d) {
+      return hasExactly(d, ['testId', 'student', 'answers', 'date']) &&
+        str(d.testId, 1, 64) && login(d.student) && day(d.date) &&
+        d.answers is list && d.answers.size() <= 30;
+    }
+    function isValidProblem(d) {
+      return hasExactly(d, ['topic', 'grade', 'difficulty', 'text', 'answer', 'solution']) &&
+        str(d.topic, 1, 200) && optGrade(d.grade) && intIn(d.difficulty, 1, 3) &&
+        str(d.text, 1, 4000) && str(d.answer, 1, 300) && str(d.solution, 0, 4000);
+    }
+    // Ключ открывается ученику после сдачи; родителю — после того, как сдал его ребёнок.
+    function hasSubmitted(testId) {
+      return isMember() && (exists(resultPath(testId + '_' + myUsername())) ||
+        (me().role == 'parent' && me().child != '' && exists(resultPath(testId + '_' + me().child))));
+    }
+
+    match /tests/{id} {
+      allow read: if isAdmin() || (isMember() && resource.data.student == '') || isMyStudent(resource.data.student);
+      allow create, update: if isAdmin() && isValidTest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /testKeys/{testId} {
+      allow read: if isAdmin() || hasSubmitted(testId);
+      allow create, update: if isAdmin() && hasExactly(request.resource.data, ['answers']) &&
+        request.resource.data.answers is list &&
+        request.resource.data.answers.size() >= 1 && request.resource.data.answers.size() <= 30;
+      allow delete: if isAdmin();
+    }
+
+    match /testResults/{resultId} {
+      allow read: if isAdmin() || isMyStudent(resource.data.student);
+      // Сдаёт только сам ученик, один раз, тест должен быть ему доступен, ответов — ровно по числу вопросов.
+      allow create: if isMember() && me().role == 'student' &&
+        isValidResult(request.resource.data) &&
+        request.resource.data.student == myUsername() &&
+        resultId == request.resource.data.testId + '_' + myUsername() &&
+        exists(testPath(request.resource.data.testId)) &&
+        get(testPath(request.resource.data.testId)).data.student in ['', myUsername()] &&
+        request.resource.data.answers.size() == get(testPath(request.resource.data.testId)).data.questions.size();
+      allow delete: if isAdmin();
+    }
+
+    match /problems/{id} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() && isValidProblem(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /messages/{id} {

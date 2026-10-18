@@ -433,6 +433,88 @@ td button.att-file{max-width:200px}
 .viewer figcaption span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .viewer figcaption button{color:#ece3d1;border-color:rgba(236,227,209,.35)}
 
+/* ---------- Формулы ---------- */
+.katex{font-size:1.08em;color:inherit}
+.katex-display{margin:.6em 0;overflow-x:auto;overflow-y:hidden;padding:4px 0}
+.math-preview{margin-top:8px;padding:10px 14px;border-left:1px solid var(--gold);background:color-mix(in srgb,var(--gold) 5%,transparent);font-size:.95rem;white-space:pre-wrap}
+.math-preview::before{content:"Предпросмотр";display:block;font-size:.7rem;color:var(--faint);margin-bottom:4px}
+.math-hint code{font-family:inherit;color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,transparent);padding:1px 5px;border-radius:2px}
+.form-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:20px}
+.form-actions button[type="submit"]{margin-top:0}
+
+/* ---------- Тесты ---------- */
+.test-run{animation:panelIn .6s var(--ease) both}
+.test-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.test-head h3{font-size:1.5rem;margin:0}
+.question{margin:0 0 14px;padding:16px 18px;border:1px solid var(--line-soft);border-radius:var(--r);background:color-mix(in srgb,var(--wall) 30%,transparent)}
+.question legend{display:flex;gap:12px;align-items:baseline;padding:0;font-size:1rem;line-height:1.5;width:100%}
+.q-num{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1px solid color-mix(in srgb,var(--gold) 60%,transparent);font:500 1rem/1 var(--serif);color:var(--gold);font-variant-numeric:lining-nums}
+.q-text{flex:1;min-width:0}
+.question > input{margin-top:12px;max-width:360px}
+.options{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.option{display:flex;align-items:center;gap:12px;margin:0;padding:10px 14px;border:1px solid var(--line-soft);border-radius:var(--r);font-size:.95rem;font-weight:400;color:var(--text);cursor:pointer;transition:border-color .3s var(--ease),background-color .3s var(--ease)}
+.option:hover{border-color:var(--gold)}
+.option input{width:18px;height:18px;min-height:0;margin:0;accent-color:var(--gold);flex:none}
+.option:has(input:checked){border-color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,transparent)}
+.test-form > button[type="submit"]{margin-top:8px}
+.test-score{display:flex;align-items:baseline;gap:14px;margin:4px 0 20px;padding:18px 22px;border:1px solid var(--line);border-left:2px solid currentColor;border-radius:var(--r);animation:panelIn .7s var(--ease) both}
+.test-score strong{font:400 3.2rem/1 var(--serif);font-variant-numeric:lining-nums;color:var(--text)}
+.test-score strong span{font-size:1.5rem;color:var(--muted)}
+.test-score > span{color:var(--muted);font-size:.9rem}
+.test-score.done{color:var(--verdigris)}
+.test-score.pending{color:var(--ochre)}
+.test-score.overdue{color:var(--vermilion)}
+.review{list-style:none;counter-reset:q;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.review li{counter-increment:q;position:relative;padding:12px 16px 12px 46px;border:1px solid var(--line-soft);border-radius:var(--r);background:color-mix(in srgb,var(--wall) 30%,transparent)}
+.review li::before{content:counter(q);position:absolute;left:14px;top:12px;font:500 1.05rem/1.4 var(--serif);color:var(--faint)}
+.review-q{margin-bottom:6px}
+.review-a,.review-key{font-size:.88rem}
+.review .mark{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:.75rem;margin-right:4px}
+.review .right .mark{background:color-mix(in srgb,var(--verdigris) 20%,transparent);color:var(--verdigris)}
+.review .wrong .mark{background:color-mix(in srgb,var(--vermilion) 18%,transparent);color:var(--vermilion)}
+.review .wrong{border-left:2px solid var(--vermilion)}
+.review .right{border-left:2px solid var(--verdigris)}
+.review-key{color:var(--verdigris);margin-top:4px}
+.answers-row td{background:color-mix(in srgb,var(--wall) 40%,transparent)}
+.cell-actions{white-space:nowrap}
+.cell-actions button{padding:7px 12px;min-height:32px;font-size:.78rem}
+.test-admin .table-wrap{margin:10px 0}
+/* конструктор */
+.q-list{display:flex;flex-direction:column;gap:14px;margin-top:18px}
+.q-card{position:relative;margin:0;padding:14px 18px 18px;border:1px solid var(--line);border-radius:var(--r);background:color-mix(in srgb,var(--wall) 30%,transparent);animation:panelIn .5s var(--ease) both}
+.q-card legend{padding:0 6px;font:500 1.1rem/1 var(--serif);color:var(--gold)}
+.q-card .q-remove{position:absolute;top:10px;right:10px}
+.q-options{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.q-option{display:flex;align-items:center;gap:10px}
+.q-option input[type="radio"]{width:18px;height:18px;min-height:0;flex:none;accent-color:var(--gold)}
+.q-card [data-add-option]{padding:7px 14px;min-height:32px;font-size:.8rem}
+
+/* ---------- Банк задач ---------- */
+.bank-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{padding:7px 14px;min-height:34px;font-size:.8rem;color:var(--muted)}
+.chip.active{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
+.bank-progress{position:relative;display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:.82rem;color:var(--muted)}
+.bank-progress span{flex:1;height:3px;background:var(--line-soft);border-radius:2px;overflow:hidden;max-width:260px}
+.bank-progress span::after{content:"";display:block;height:100%;width:var(--p,0%);background:var(--verdigris);transition:width .8s var(--ease)}
+.bank-progress b{font-weight:600}
+.bank-topic{margin:22px 0 4px;font-size:1.3rem}
+.difficulty{color:var(--gold);letter-spacing:.15em;font-size:.8rem}
+.problem-text{margin:8px 0 12px;font-size:1rem;line-height:1.6}
+.problem-check{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.problem-check input{max-width:240px}
+.problem-check button{margin:0}
+.feedback{font-size:.86rem}
+.feedback.ok{color:var(--verdigris)}
+.feedback.bad{color:var(--vermilion)}
+.problem.solved{border-left:2px solid var(--verdigris)}
+.problem.solved::after{content:"решено";position:absolute;top:18px;right:0;font-size:.7rem;color:var(--verdigris)}
+.problem .row{padding-right:56px}
+.problem-solution{margin-top:12px;font-size:.92rem}
+.problem-solution summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:.85rem;width:max-content}
+.problem-solution p{margin:8px 0 0;color:var(--muted)}
+.shake{animation:shake .45s var(--ease-soft)}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+
 /* ---------- Смотритель (чат-ассистент) ---------- */
 .assistant{position:fixed;right:20px;bottom:20px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
 .assistant-toggle{gap:10px;padding:0 20px 0 16px;min-height:52px;background:color-mix(in srgb,var(--wall) 82%,transparent);border-color:color-mix(in srgb,var(--gold) 70%,transparent);color:var(--gold);

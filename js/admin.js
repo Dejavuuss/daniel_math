@@ -3,6 +3,10 @@ import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { mountArt, QUOTES } from "./art.js";
 import { esc, byDate, showToast, setStatus, initTabs, noteHtml, messageHtml } from "./ui.js";
 import { createPicker, attach, attachmentsHtml, bindAttachments, filesFor } from "./files.js";
+import { autoTypeset, mathPreview } from "./math.js";
+import { mountTestBuilder } from "./test-builder.js";
+import { reviewHtml } from "./practice.js";
+import { scoreOf } from "./quiz.js";
 
 const adminUser = requireAuth("admin");
 let state = null;
@@ -13,6 +17,8 @@ mountArt(document.getElementById("art"), "athens");
 rotateQuotes(document.getElementById("quote"), QUOTES.admin);
 document.getElementById("logoutBtn").onclick = logout;
 if (adminUser) document.getElementById("adminGreeting").textContent = greeting() + ", " + adminUser.name.split(" ")[0] + "!";
+autoTypeset(document.querySelector("main"));
+document.querySelectorAll("[data-preview-for]").forEach(out => mathPreview(document.getElementById(out.dataset.previewFor), out));
 // Даты в формах по умолчанию — сегодня.
 document.querySelectorAll('input[type="date"]').forEach(i => { i.value = today(); i.defaultValue = today(); });
 
@@ -38,11 +44,11 @@ async function loadData() {
 
 function fillStudents() {
     const opts = state.users.filter(u => u.role === "student").map(u => `<option value="${esc(u.username)}">${esc(u.name)} (${esc(u.username)})</option>`).join("");
-    ["studentSelect","eventStudent","gradeStudent","parentChild","noteStudent","payStudent","achStudent"].forEach(id => {
+    ["studentSelect","eventStudent","gradeStudent","parentChild","noteStudent","payStudent","achStudent","testStudent"].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         const keep = el.value;
-        el.innerHTML = (id === "eventStudent" ? '<option value="">Все ученики</option>' : "") + opts;
+        el.innerHTML = (id === "eventStudent" || id === "testStudent" ? '<option value="">Все ученики</option>' : "") + opts;
         if (keep) el.value = keep;
     });
     document.getElementById("msgTo").innerHTML = state.users.filter(u => u.role !== "admin")
@@ -85,12 +91,64 @@ function renderLists() {
         ? recent(state.messages).map(m => messageHtml(m, adminUser.username, nameOf, filesCell("message", m.id))).join("")
         : '<p class="muted">Сообщений пока нет.</p>';
 
+    renderTests();
+    renderProblems();
+
     document.querySelectorAll("[data-delete-sheet]").forEach(btn => btn.onclick = async () => {
-        if (!confirm("Удалить эту запись?")) return;
+        if (!confirm(btn.dataset.confirm || "Удалить эту запись?")) return;
         btn.disabled = true;
         try { await apiPost({ action:"deleteRow", sheet:btn.dataset.deleteSheet, id:btn.dataset.deleteId }); await loadData(); showToast("Запись удалена"); }
         catch (e) { btn.disabled = false; showToast("Не удалось удалить: " + e.message, true); }
     });
+}
+
+// Тесты: у каждого — кто сдал (балл считается из ответов и ключа) и кто ещё нет.
+function renderTests() {
+    const box = document.getElementById("l-tests");
+    const tests = state.tests.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    if (!tests.length) { box.innerHTML = '<p class="muted">Тестов пока нет.</p>'; return; }
+    const students = state.users.filter(u => u.role === "student");
+    box.innerHTML = tests.map(t => {
+        const key = state.testKeys[t.id] || [];
+        const results = state.testResults.filter(r => r.testId === t.id);
+        const audience = t.student ? [students.find(s => s.username === t.student)].filter(Boolean)
+            : students.filter(s => !t.grade || String(s.grade) === String(t.grade));
+        const missing = audience.filter(s => !results.some(r => r.student === s.username));
+        return `<article class="item test-admin">
+            <div class="row"><h3>${esc(t.title)}</h3><span class="badge plain">${t.student ? esc(nameOf(t.student)) : t.grade ? `все, ${esc(t.grade)} класс` : "все ученики"}</span></div>
+            <p class="muted small">${[t.topic, t.questions.length + " вопр.", "создан " + t.date].filter(Boolean).map(esc).join(", ")}</p>
+            ${results.length ? `<div class="table-wrap"><table><thead><tr><th>Ученик</th><th>Результат</th><th>Сдан</th><th></th></tr></thead><tbody>
+                ${results.map(r => { const s = scoreOf(t, key, r.answers); return `<tr>
+                    <td>${esc(nameOf(r.student))}</td><td><strong>${s.correct} из ${s.total}</strong></td><td>${esc(r.date)}</td>
+                    <td class="cell-actions"><button data-show-answers="${esc(r.id)}">Ответы</button>
+                    <button class="danger" data-delete-sheet="testResults" data-delete-id="${esc(r.id)}" data-confirm="Удалить результат? Ученик сможет пройти тест заново.">Пересдать</button></td></tr>
+                    <tr class="answers-row" id="answers-${esc(r.id)}" hidden><td colspan="4">${reviewHtml(t, key, r.answers)}</td></tr>`; }).join("")}
+            </tbody></table></div>` : '<p class="muted small">Ещё никто не сдал.</p>'}
+            ${missing.length ? `<p class="muted small">Не сдали: ${missing.map(s => esc(s.name)).join(", ")}</p>` : ""}
+            <button class="danger" data-delete-sheet="tests" data-delete-id="${esc(t.id)}" data-confirm="Удалить тест вместе с результатами?">Удалить тест</button>
+        </article>`;
+    }).join("");
+    box.querySelectorAll("[data-show-answers]").forEach(b => b.onclick = () => {
+        const row = document.getElementById("answers-" + b.dataset.showAnswers);
+        row.hidden = !row.hidden;
+        b.textContent = row.hidden ? "Ответы" : "Скрыть";
+    });
+}
+
+function renderProblems() {
+    const box = document.getElementById("l-problems");
+    const topics = [...new Set(state.problems.map(p => p.topic))].sort((a, b) => a.localeCompare(b, "ru"));
+    document.getElementById("topicList").innerHTML = topics.map(t => `<option value="${esc(t)}">`).join("");
+    if (!state.problems.length) { box.innerHTML = '<p class="muted">Задач пока нет.</p>'; return; }
+    box.innerHTML = topics.map(topic => {
+        const list = state.problems.filter(p => p.topic === topic).sort((a, b) => a.difficulty - b.difficulty);
+        return `<h3 class="bank-topic">${esc(topic)} <span class="muted small">${list.length}</span></h3>${list.map(p => `<article class="item compact problem-admin">
+            <div class="row"><span class="difficulty" aria-label="Сложность ${p.difficulty} из 3">${"●".repeat(p.difficulty)}${"○".repeat(3 - p.difficulty)}</span>${p.grade ? `<span class="badge plain">${esc(p.grade)} класс</span>` : ""}</div>
+            <div class="problem-text">${esc(p.text)}</div>
+            <p class="muted small">Ответ: ${esc(p.answer)}</p>
+            <button class="danger" data-delete-sheet="problems" data-delete-id="${esc(p.id)}">Удалить</button>
+        </article>`).join("")}`;
+    }).join("");
 }
 
 function formData(form) { const o = {}; new FormData(form).forEach((v, k) => { o[k] = v; }); return o; }
@@ -133,6 +191,23 @@ submitForm("f-payments", "addPayment", "Запись добавлена");
 submitForm("f-achievements", "addAchievement", "Достижение выдано");
 submitForm("f-messages", "addMessage", "Сообщение отправлено", { kind:"message", extra:d => ({ from:adminUser.username, to:d.to }) });
 submitForm("f-students", "addStudent", "Аккаунт ученика создан");
+submitForm("f-problems", "addProblem", "Задача добавлена");
+
+// Тест собирается из конструктора вопросов, поэтому сохраняется отдельно.
+const testForm = document.getElementById("f-tests");
+const builder = mountTestBuilder(testForm);
+testForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const button = testForm.querySelector('button[type="submit"]');
+    button.disabled = true; button.textContent = "Сохраняем…";
+    try {
+        await apiPost(Object.assign({ action:"addTest" }, formData(testForm), { questions:builder.collect() }));
+        testForm.reset(); builder.reset();
+        await loadData();
+        showToast("Тест сохранён");
+    } catch (err) { showToast("Не удалось сохранить: " + err.message, true); }
+    finally { button.disabled = false; button.textContent = "Сохранить тест"; }
+});
 submitForm("f-parents", "addParent", "Аккаунт родителя создан");
 
 ["l-materials", "l-homework", "l-messages"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));

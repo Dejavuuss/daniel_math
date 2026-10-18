@@ -289,3 +289,64 @@ test("файлы: размеры, лишние куски, подмена и и�
   b.delete(doc(i, "files", "f-ok", "chunks", "0")); b.delete(doc(i, "files", "f-ok"));
   await assertSucceeds(b.commit());
 });
+
+/* ---------- Тесты и банк задач ---------- */
+
+const testDoc = (student = "", n = 2) => ({ title:"Дроби", topic:"Арифметика", grade:null, student, description:"", date:"2026-10-18",
+  questions:[...Array(n)].map((_, i) => ({ text:"Вопрос " + i, type:"number", options:[] })) });
+async function seedTest(id, student = "", n = 2) {
+  await env.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), "tests", id), testDoc(student, n));
+    await setDoc(doc(ctx.firestore(), "testKeys", id), { answers:[...Array(n)].map(() => "1") });
+  });
+}
+const result = (testId, student, n = 2) => ({ testId, student, answers:[...Array(n)].map(() => "1"), date:"2026-10-18" });
+
+test("тесты: репетитор создаёт, ученик видит общие и свои, но не чужие", async () => {
+  await assertSucceeds(setDoc(doc(as("teacher"), "tests", "t-new"), testDoc()));
+  await assertSucceeds(setDoc(doc(as("teacher"), "testKeys", "t-new"), { answers:["1", "2"] }));
+  await assertFails(setDoc(doc(as("ivan"), "tests", "t-x"), testDoc()));
+  await seedTest("t-all"); await seedTest("t-anna", "anna");
+  const i = as("ivan");
+  await assertSucceeds(getDocs(query(collection(i, "tests"), where("student", "in", ["", "ivan"]))));
+  await assertFails(getDoc(doc(i, "tests", "t-anna")));
+  await assertFails(getDocs(collection(i, "tests")));
+});
+
+test("ключ ответов закрыт до сдачи и открывается после", async () => {
+  await seedTest("t1");
+  const i = as("ivan");
+  await assertFails(getDoc(doc(i, "testKeys", "t1")));
+  await assertFails(getDoc(doc(as("parent_ivan"), "testKeys", "t1")));
+  await assertSucceeds(setDoc(doc(i, "testResults", "t1_ivan"), result("t1", "ivan")));
+  await assertSucceeds(getDoc(doc(i, "testKeys", "t1")));
+  await assertSucceeds(getDoc(doc(as("parent_ivan"), "testKeys", "t1")));
+  await assertFails(getDoc(doc(as("anna"), "testKeys", "t1")));
+});
+
+test("сдача теста: один раз, только за себя, ответы не меняются", async () => {
+  await seedTest("t2"); await seedTest("t-anna2", "anna");
+  const i = as("ivan");
+  await assertFails(setDoc(doc(i, "testResults", "t2_anna"), result("t2", "anna")));
+  await assertFails(setDoc(doc(i, "testResults", "t2_x"), result("t2", "ivan")));
+  await assertFails(setDoc(doc(i, "testResults", "t2_ivan"), result("t2", "ivan", 3)));
+  await assertFails(setDoc(doc(i, "testResults", "t-anna2_ivan"), result("t-anna2", "ivan")));
+  await assertFails(setDoc(doc(i, "testResults", "нет_ivan"), result("нет", "ivan")));
+  await assertFails(setDoc(doc(as("parent_ivan"), "testResults", "t2_parent_ivan"), result("t2", "parent_ivan")));
+  await assertSucceeds(setDoc(doc(i, "testResults", "t2_ivan"), result("t2", "ivan")));
+  await assertFails(setDoc(doc(i, "testResults", "t2_ivan"), result("t2", "ivan")));
+  await assertFails(updateDoc(doc(i, "testResults", "t2_ivan"), { answers:["9", "9"] }));
+  await assertFails(deleteDoc(doc(i, "testResults", "t2_ivan")));
+  await assertSucceeds(getDocs(query(collection(as("parent_ivan"), "testResults"), where("student", "==", "ivan"))));
+  await assertFails(getDoc(doc(as("anna"), "testResults", "t2_ivan")));
+  await assertSucceeds(deleteDoc(doc(as("teacher"), "testResults", "t2_ivan")));
+});
+
+test("банк задач: читают все участники, пишет только репетитор", async () => {
+  const p = { topic:"Уравнения", grade:9, difficulty:2, text:"Решите $x^2=4$", answer:"2; -2", solution:"" };
+  await assertSucceeds(setDoc(doc(as("teacher"), "problems", "p1"), p));
+  await assertFails(setDoc(doc(as("teacher"), "problems", "p2"), Object.assign({}, p, { difficulty:5 })));
+  await assertFails(setDoc(doc(as("ivan"), "problems", "p3"), p));
+  await assertSucceeds(getDocs(collection(as("ivan"), "problems")));
+  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), "problems")));
+});

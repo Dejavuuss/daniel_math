@@ -4,6 +4,8 @@ import { mountArt, QUOTES } from "./art.js";
 import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml } from "./ui.js";
 import { renderCalendar } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
+import { autoTypeset } from "./math.js";
+import { mountTests, mountBank } from "./practice.js";
 
 const currentUser = requireAuth();
 if (currentUser && currentUser.role === "parent") location.replace("parent.html");
@@ -43,6 +45,15 @@ async function loadData() {
         events.push(...state.homework.filter(h => h.student === currentUser.username && h.due)
             .map(h => ({ date:String(h.due).slice(0, 10), time:"", type:"deadline", title:"Дедлайн: " + h.title, description:"" })));
         renderCalendar(document.getElementById("calendar"), events);
+        mountTests(document.getElementById("tests"), {
+            tests:state.tests, results:state.testResults, keys:state.testKeys, grade:currentUser.grade,
+            canTake:currentUser.role === "student",
+            onSubmitted:(testId, answers, key) => {
+                state.testResults.push({ id:`${testId}_${currentUser.username}`, testId, student:currentUser.username, answers, date:today() });
+                if (key) state.testKeys[testId] = key;
+            }
+        });
+        mountBank(document.getElementById("bank"), state.problems, "tutor_bank_solved_" + currentUser.username);
         updateStats();
         setStatus(status, "Данные обновлены", "ok");
     } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }
@@ -146,6 +157,7 @@ function renderHomework() {
     });
 }
 
+autoTypeset(document.querySelector("main"));
 ["materials", "homework", "messagesList"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));
 if (currentUser) bindSolutionUploads(document.getElementById("homework"), currentUser.username, loadData);
 

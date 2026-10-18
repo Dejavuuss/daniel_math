@@ -4,6 +4,8 @@ import { mountArt, QUOTES } from "./art.js";
 import { esc, byDate, fmtDate, average, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, stars } from "./ui.js";
 import { TYPE_INFO } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
+import { autoTypeset } from "./math.js";
+import { mountTests } from "./practice.js";
 
 let files = [];
 
@@ -78,8 +80,13 @@ async function loadParentData() {
             ${filesHtml("material", m.id)}
         </article>`).join("") : '<p class="muted">Материалов пока нет.</p>';
 
+        mountTests(document.getElementById("parentTests"), {
+            tests:data.tests, results:data.testResults, keys:data.testKeys, grade:child ? child.grade : "", canTake:false, onSubmitted:() => {}
+        });
+
         setStatus(status, "Данные обновлены", "ok");
     } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }
 }
+autoTypeset(document.querySelector("main"));
 ["parentHomework", "parentMaterials", "parentMessages"].forEach(id => bindAttachments(document.getElementById(id), () => files, loadParentData));
 if (parentUser) loadParentData();

@@ -47,6 +47,8 @@
 <nav class="tabs" role="tablist" data-reveal>
     <button class="tab active" role="tab" aria-selected="true" data-tab="t-materials">Материалы</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-homework">Задания</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-tests">Тесты</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-bank">Банк задач</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-schedule">Календарь</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-grades">Оценки</button>
     <button class="tab" role="tab" aria-selected="false" data-tab="t-notes">Заметки</button>
@@ -67,6 +69,8 @@
     </div>
     <label for="m-url">Ссылка</label><input id="m-url" name="url" type="url" placeholder="https://…">
     <label for="m-desc">Описание</label><textarea id="m-desc" name="description" rows="2"></textarea>
+    <div class="math-preview" hidden data-preview-for="m-desc"></div>
+    <p class="form-hint math-hint">Формулы пишите в знаках доллара: <code class="no-math">$x^2$</code>, <code class="no-math">$\frac{1}{2}$</code>, <code class="no-math">$\sqrt{x}$</code> — отобразятся как в учебнике.</p>
     <div data-attach></div>
     <button class="primary" type="submit">Сохранить материал</button>
 </form>
@@ -84,10 +88,53 @@
     </div>
     <label for="h-link">Ссылка на объяснение</label><input id="h-link" name="link" type="url" placeholder="https://youtube.com/watch?v=…">
     <label for="h-comment">Комментарий</label><textarea id="h-comment" name="comment" rows="2"></textarea>
+    <div class="math-preview" hidden data-preview-for="h-comment"></div>
     <div data-attach></div>
     <button class="primary" type="submit">Выдать задание</button>
 </form>
 <h2 class="list-title">Домашние задания</h2><div id="l-homework"></div>
+</section>
+
+<section id="t-tests" class="tab-panel card" role="tabpanel">
+<h2>Создать тест</h2>
+<p class="form-hint">Ученик видит вопросы сразу, а правильные ответы — только после того, как отправит свои. Проверка и балл — автоматически.</p>
+<form id="f-tests">
+    <div class="grid2">
+        <div><label for="t-title">Название</label><input id="t-title" name="title" required></div>
+        <div><label for="t-topic">Тема</label><input id="t-topic" name="topic" placeholder="Например, дроби"></div>
+        <div><label for="testStudent">Для кого</label><select id="testStudent" name="student"><option value="">Все ученики</option></select></div>
+        <div><label for="t-grade">Класс (если для всех; пусто — любой)</label><input id="t-grade" name="grade" type="number" min="1" max="11"></div>
+    </div>
+    <label for="t-desc">Описание</label><input id="t-desc" name="description" placeholder="Например, 10 минут, без калькулятора">
+    <p class="form-hint math-hint">Формулы пишите в знаках доллара: <code class="no-math">$x^2$</code>, <code class="no-math">$\frac{1}{2}$</code>, <code class="no-math">$\sqrt{x}$</code> — отобразятся как в учебнике.</p>
+    <div data-questions class="q-list"></div>
+    <div class="form-actions">
+        <button type="button" data-add-question>Добавить вопрос</button>
+        <button class="primary" type="submit">Сохранить тест</button>
+    </div>
+</form>
+<h2 class="list-title">Тесты и результаты</h2><div id="l-tests"></div>
+</section>
+
+<section id="t-bank" class="tab-panel card" role="tabpanel">
+<h2>Добавить задачу в банк</h2>
+<p class="form-hint">Ученики решают задачи сами во вкладке «Тренировка»: вводят ответ и сразу видят, верно ли, а при желании открывают решение.</p>
+<form id="f-problems">
+    <div class="grid2">
+        <div><label for="pr-topic">Тема</label><input id="pr-topic" name="topic" list="topicList" required placeholder="Например, уравнения"></div>
+        <div><label for="pr-grade">Класс (пусто — для всех)</label><input id="pr-grade" name="grade" type="number" min="1" max="11"></div>
+        <div><label for="pr-diff">Сложность</label><select id="pr-diff" name="difficulty"><option value="1">Лёгкая</option><option value="2">Средняя</option><option value="3">Сложная</option></select></div>
+        <div><label for="pr-answer">Ответ</label><input id="pr-answer" name="answer" required placeholder="Несколько — через точку с запятой: 3; -3"></div>
+    </div>
+    <label for="pr-text">Условие</label><textarea id="pr-text" name="text" rows="3" required placeholder="Решите уравнение $x^2 - 9 = 0$"></textarea>
+    <div class="math-preview" hidden data-preview-for="pr-text"></div>
+    <label for="pr-solution">Решение (необязательно)</label><textarea id="pr-solution" name="solution" rows="3"></textarea>
+    <div class="math-preview" hidden data-preview-for="pr-solution"></div>
+    <p class="form-hint math-hint">Формулы пишите в знаках доллара: <code class="no-math">$x^2$</code>, <code class="no-math">$\frac{1}{2}$</code>, <code class="no-math">$\sqrt{x}$</code> — отобразятся как в учебнике.</p>
+    <button class="primary" type="submit">Добавить задачу</button>
+</form>
+<datalist id="topicList"></datalist>
+<h2 class="list-title">Банк задач</h2><div id="l-problems"></div>
 </section>
 
 <section id="t-schedule" class="tab-panel card" role="tabpanel">
@@ -133,6 +180,7 @@
         <div><label for="n-rating">Усвоение</label><select id="n-rating" name="rating"><option value="5">Отлично</option><option value="4">Хорошо</option><option value="3">Средне</option><option value="2">Плохо</option><option value="1">Не понял</option></select></div>
     </div>
     <label for="n-note">Заметка</label><textarea id="n-note" name="note" rows="4" placeholder="Прошли квадратные уравнения. Хорошо решает через дискриминант, путается с теоремой Виета…"></textarea>
+    <div class="math-preview" hidden data-preview-for="n-note"></div>
     <button class="primary" type="submit">Сохранить заметку</button>
 </form>
 <h2 class="list-title">История занятий</h2><div id="l-notes"></div>
@@ -175,6 +223,7 @@
         <div><label for="msgTo">Кому</label><select name="to" id="msgTo" required></select></div>
     </div>
     <label for="msg-text">Сообщение</label><textarea id="msg-text" name="text" rows="3" required></textarea>
+    <div class="math-preview" hidden data-preview-for="msg-text"></div>
     <div data-attach></div>
     <button class="primary" type="submit">Отправить</button>
 </form>
