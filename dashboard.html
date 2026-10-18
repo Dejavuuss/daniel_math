@@ -1,15 +1,37 @@
 <!doctype html>
-<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Кабинет ученика</title>
-<meta name="theme-color" content="#17120f">
-<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#ffffff">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme_v2")||"light"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e30613'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='800' text-anchor='middle' fill='%23fff' font-family='Helvetica,Arial,sans-serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css"></head>
-<body class="page-dashboard">
-<header class="topbar"><div class="container">
-    <div class="brand"><div class="seal" aria-hidden="true">Σ</div><div><h1>Кабинет ученика</h1><span class="brand-sub">Математика с репетитором</span></div></div>
+<body class="app page-dashboard">
+<aside class="sidebar" id="sidebar" aria-label="Разделы">
+    <div class="side-head">
+        <span class="logo" aria-hidden="true">Σ</span>
+        <div class="side-brand"><b>Математика</b><span>Кабинет ученика</span></div>
+        <button class="icon-btn side-collapse" id="navToggle" type="button" aria-label="Свернуть панель" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist" aria-orientation="vertical">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="t-overview" data-icon="home">Обзор</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-materials" data-icon="book">Материалы</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-homework" data-icon="list">Домашние задания</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-tests" data-icon="clipboard">Тесты</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-bank" data-icon="target">Тренировка</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-notes" data-icon="note">Заметки</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-calendar" data-icon="calendar">Календарь</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-messages" data-icon="chat">Сообщения</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-gallery" data-icon="image">Галерея</button>
+    </nav>
+    <div class="side-foot">Математика с репетитором</div>
+</aside>
+<div class="app-main">
+<header class="topbar"><div class="bar">
+    <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Открыть разделы"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <h1 class="view-title" id="viewTitle">Обзор</h1>
+    <p id="loadStatus" class="status-line top-status" role="status">Загружаем данные…</p>
     <div class="actions">
         <a id="adminLink" class="btn" href="admin.html" hidden>Панель</a>
         <button id="themeBtn" class="icon-btn" aria-label="Сменить тему"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
@@ -18,9 +40,10 @@
 </div></header>
 
 <main class="container">
+<section id="t-overview" class="tab-panel active" role="tabpanel" aria-label="Обзор">
 <section class="hall">
     <div>
-        <p class="hall-label">Зал Дюрера</p>
+        <p class="hall-label">Альбрехт Дюрер. Меланхолия I</p>
         <h2><span class="line"><span id="greeting">Привет!</span></span><span class="line"><span>Разберёмся шаг за шагом.</span></span></h2>
         <p class="lede">Материалы, задания, оценки и заметки с занятий — в одном месте.</p>
         <div class="quote" id="quote"></div>
@@ -31,12 +54,11 @@
             <b>Альбрехт Дюрер</b>
             <i>Меланхолия I</i>
             <span>1514. Гравюра на меди. Метрополитен-музей, Нью-Йорк</span>
-            <p>Крылатую фигуру окружают инструменты геометра: циркуль, весы, песочные часы, многогранник и магический квадрат. Квадрат можно разобрать ниже, в этюде.</p>
+            <p>Крылатую фигуру окружают инструменты геометра: циркуль, весы, песочные часы, многогранник и магический квадрат. Разбор квадрата — в разделе «Галерея».</p>
         </figcaption>
     </figure>
 </section>
 
-<p id="loadStatus" class="status-line">Загружаем данные…</p>
 <div id="dashboardStats" class="stats-grid"></div>
 
 <div class="widgets-grid">
@@ -54,20 +76,21 @@
         <div id="deadlinesList"></div>
     </section>
     <section class="widget" data-reveal="1">
-        <h3 class="widget-title">Сообщения <span id="unreadBadge" class="badge info" hidden>0</span></h3>
+        <h3 class="widget-title">Сообщения <span id="unreadBadge" class="badge overdue" hidden>0</span><a class="more" href="#messages" data-open="t-messages">Все сообщения</a></h3>
         <div id="messagesList"></div>
     </section>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Учёный дня <a class="more" href="#gallery" data-open="t-gallery">Вся галерея</a></h3>
+        <div id="dailyScientist"></div>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Из галереи <a class="more" href="#gallery" data-open="t-gallery">Смотреть</a></h3>
+        <div id="galleryTeaser"></div>
+        <p class="chart-caption">Картины и портреты учёных — в разделе «Галерея»</p>
+    </section>
 </div>
-
-<nav class="tabs" role="tablist" data-reveal>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="t-materials">Материалы</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-homework">Домашние задания</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-tests">Тесты</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-bank">Тренировка</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-notes">Заметки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-calendar">Календарь</button>
-</nav>
-<section id="t-materials" class="tab-panel active card" role="tabpanel">
+</section>
+<section id="t-materials" class="tab-panel card" role="tabpanel">
     <div class="section-heading"><h2>Материалы</h2><span class="hint" id="classHint">по твоему классу</span></div>
     <div id="materials"></div>
 </section>
@@ -90,8 +113,13 @@
 <section id="t-calendar" class="tab-panel card" role="tabpanel">
     <div id="calendar"></div>
 </section>
-<div id="gallery" class="gallery"></div>
+<section id="t-messages" class="tab-panel card" role="tabpanel">
+<div class="section-heading"><h2>Сообщения</h2><span class="hint">репетитору, ученикам и родителям</span></div>
+<div id="messenger"></div>
+</section>
+<section id="t-gallery" class="tab-panel" role="tabpanel" aria-label="Галерея"><div id="gallery" class="gallery"></div></section>
 </main>
+</div>
 <script type="module" src="js/dashboard.js"></script>
 <script type="module" src="js/assistant.js"></script>
 </body></html>

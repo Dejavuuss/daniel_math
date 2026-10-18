@@ -1,15 +1,38 @@
 <!doctype html>
-<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Кабинет родителя</title>
-<meta name="theme-color" content="#17120f">
-<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#ffffff">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme_v2")||"light"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e30613'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='800' text-anchor='middle' fill='%23fff' font-family='Helvetica,Arial,sans-serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css"></head>
-<body class="page-parent">
-<header class="topbar"><div class="container">
-    <div class="brand"><div class="seal" aria-hidden="true">π</div><div><h1>Кабинет родителя</h1><span class="brand-sub">Математика с репетитором</span></div></div>
+<body class="app page-parent">
+<aside class="sidebar" id="sidebar" aria-label="Разделы">
+    <div class="side-head">
+        <span class="logo" aria-hidden="true">Σ</span>
+        <div class="side-brand"><b>Математика</b><span>Кабинет родителя</span></div>
+        <button class="icon-btn side-collapse" id="navToggle" type="button" aria-label="Свернуть панель" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist" aria-orientation="vertical">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="t-overview" data-icon="home">Обзор</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-done" data-icon="check">Пройдено</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-schedule" data-icon="calendar">Расписание</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-homework" data-icon="list">Домашние задания</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-grades" data-icon="chart">Оценки</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-tests" data-icon="clipboard">Тесты</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-notes" data-icon="note">Заметки</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-materials" data-icon="book">Материалы</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="p-messages" data-icon="chat">Сообщения</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-gallery" data-icon="image">Галерея</button>
+    </nav>
+    <div class="side-foot">Математика с репетитором</div>
+</aside>
+<div class="app-main">
+<header class="topbar"><div class="bar">
+    <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Открыть разделы"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <h1 class="view-title" id="viewTitle">Обзор</h1>
+    <p id="parentStatus" class="status-line top-status" role="status">Загружаем данные…</p>
     <div class="actions">
         <button id="themeBtn" class="icon-btn" aria-label="Сменить тему"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
         <button id="logoutBtn">Выйти</button>
@@ -17,9 +40,10 @@
 </div></header>
 
 <main class="container">
+<section id="t-overview" class="tab-panel active" role="tabpanel" aria-label="Обзор">
 <section class="hall">
     <div>
-        <p class="hall-label">Зал Хокусая</p>
+        <p class="hall-label">Кацусика Хокусай. Большая волна</p>
         <h2><span class="line"><span id="parentGreeting">Здравствуйте!</span></span><span class="line sub"><span id="childLine">На сайте представлена успеваемость вашего ребёнка</span></span></h2>
         <p class="lede">Расписание, выполнение заданий, оценки и заметки репетитора о каждом занятии.</p>
         <div class="quote" id="quote"></div>
@@ -30,12 +54,11 @@
             <b>Кацусика Хокусай</b>
             <i>Большая волна в Канагаве</i>
             <span>Около 1831. Цветная ксилография</span>
-            <p>Самая известная японская гравюра: рыбацкие лодки в шторм, а в ложбине волны — крошечная гора Фудзи. О математике волны — ниже, в этюде.</p>
+            <p>Самая известная японская гравюра: рыбацкие лодки в шторм, а в ложбине волны — крошечная гора Фудзи. О математике волны — в разделе «Галерея».</p>
         </figcaption>
     </figure>
 </section>
 
-<p id="parentStatus" class="status-line">Загружаем данные…</p>
 <div id="parentStats" class="stats-grid"></div>
 
 <div class="widgets-grid">
@@ -61,29 +84,34 @@
         <div id="parentRecentNotes"></div>
     </section>
     <section class="widget" data-reveal="1">
-        <h3 class="widget-title">Сообщения</h3>
+        <h3 class="widget-title">Сообщения <a class="more" href="#messages" data-open="p-messages">Все сообщения</a></h3>
         <div id="parentMessages"></div>
     </section>
+    <section class="widget" data-reveal>
+        <h3 class="widget-title">Учёный дня <a class="more" href="#gallery" data-open="t-gallery">Вся галерея</a></h3>
+        <div id="dailyScientist"></div>
+    </section>
+    <section class="widget" data-reveal="1">
+        <h3 class="widget-title">Из галереи <a class="more" href="#gallery" data-open="t-gallery">Смотреть</a></h3>
+        <div id="galleryTeaser"></div>
+        <p class="chart-caption">Картины и портреты учёных — в разделе «Галерея»</p>
+    </section>
 </div>
-
-<nav class="tabs" role="tablist" data-reveal>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="p-done">Пройдено</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-schedule">Расписание</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-homework">Домашние задания</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-grades">Оценки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-tests">Тесты</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-notes">Заметки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="p-materials">Материалы</button>
-</nav>
-<section id="p-done" class="tab-panel active card" role="tabpanel"><div class="section-heading"><h2>Что пройдено</h2><span class="hint">тесты, задания и тренировки ребёнка</span></div><div id="parentDone"></div></section>
+</section>
+<section id="p-done" class="tab-panel card" role="tabpanel"><div class="section-heading"><h2>Что пройдено</h2><span class="hint">тесты, задания и тренировки ребёнка</span></div><div id="parentDone"></div></section>
 <section id="p-homework" class="tab-panel card" role="tabpanel"><h2>Домашние задания</h2><div id="parentHomework"></div></section>
 <section id="p-grades" class="tab-panel card" role="tabpanel"><h2>Дневник оценок</h2><div id="parentGrades"></div></section>
 <section id="p-tests" class="tab-panel card" role="tabpanel"><h2>Тесты</h2><div id="parentTests"></div></section>
 <section id="p-notes" class="tab-panel card" role="tabpanel"><h2>Заметки с занятий</h2><div id="parentNotes"></div></section>
 <section id="p-schedule" class="tab-panel card" role="tabpanel"><h2>Расписание и события</h2><div id="parentCalendar"></div><h3 class="list-title">Список событий</h3><div id="parentSchedule"></div></section>
 <section id="p-materials" class="tab-panel card" role="tabpanel"><h2>Материалы</h2><div id="parentMaterials"></div></section>
-<div id="gallery" class="gallery"></div>
+<section id="p-messages" class="tab-panel card" role="tabpanel">
+<div class="section-heading"><h2>Сообщения</h2><span class="hint">репетитору, ученикам и родителям</span></div>
+<div id="messenger"></div>
+</section>
+<section id="t-gallery" class="tab-panel" role="tabpanel" aria-label="Галерея"><div id="gallery" class="gallery"></div></section>
 </main>
+</div>
 <script type="module" src="js/parent.js"></script>
 <script type="module" src="js/assistant.js"></script>
 </body></html>

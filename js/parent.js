@@ -1,7 +1,8 @@
 import { requireAuth, apiGet, logout, today } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { QUOTES } from "./art.js";
-import { mountHall, mountGallery } from "./gallery.js";
+import { mountHall, mountGallery, scientistOfDay, galleryTeaser } from "./gallery.js";
+import { mountMessenger, trackUnread } from "./messages.js";
 import { esc, byDate, fmtDate, average, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, stars, fold, groupBy, monthOf, classLabel, genitive, daysUntil } from "./ui.js";
 import { TYPE_INFO, renderCalendar } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
@@ -10,7 +11,7 @@ import { mountTests, gradeRecords } from "./practice.js";
 import { scoreOf, gradeFor } from "./quiz.js";
 import { mountPasswordButton } from "./account.js";
 
-let files = [], testsUi = null;
+let files = [], testsUi = null, state = null;
 
 const parentUser = requireAuth("parent");
 
@@ -21,6 +22,12 @@ mountGallery(document.getElementById("gallery"), "parent");
 rotateQuotes(document.getElementById("quote"), QUOTES.parent);
 document.getElementById("logoutBtn").onclick = logout;
 mountPasswordButton();
+document.getElementById("dailyScientist").innerHTML = scientistOfDay();
+document.getElementById("galleryTeaser").innerHTML = galleryTeaser();
+const messenger = mountMessenger(document.getElementById("messenger"), {
+    me:parentUser && parentUser.username, isAdmin:false, getState:() => state, reload:() => loadParentData()
+});
+const updateUnread = trackUnread("p-messages", { me:parentUser && parentUser.username, getState:() => state });
 const parentName = u => String(u.name || "").split(",")[0].trim() || u.name;
 if (parentUser) document.getElementById("parentGreeting").textContent = `Здравствуйте, ${parentName(parentUser)}!`;
 
@@ -28,6 +35,7 @@ async function loadParentData() {
     const status = document.getElementById("parentStatus");
     try {
         const data = await apiGet();
+        state = data;
         files = data.files;
         const child = data.users.find(u => u.role === "student");
         const filesHtml = (kind, id) => attachmentsHtml(filesFor(files, kind, id), {
@@ -37,7 +45,7 @@ async function loadParentData() {
         });
         if (child) bindSolutionUploads(document.getElementById("parentHomework"), child.username, loadParentData);
         const childName = child ? child.name : "ученик";
-        const nameOf = u => (data.users.find(x => x.username === u) || {}).name || u;
+        const nameOf = u => ((data.directory || []).find(d => d.id === u) || data.users.find(x => x.username === u) || {}).name || u;
         const hw = data.homework, grades = gradeRecords(data, ""), events = data.schedule, notes = data.lessonNotes.slice().sort(byDate).reverse();
         const me = data.users.find(u => u.username === parentUser.username);
         if (me) document.getElementById("parentGreeting").textContent = `Здравствуйте, ${parentName(me)}!`;
@@ -135,6 +143,8 @@ async function loadParentData() {
             tests:data.tests, results:data.testResults, keys:data.testKeys, grade:child ? child.grade : "", canTake:false, onSubmitted:() => {}
         });
 
+        messenger.render();
+        updateUnread();
         setStatus(status, "Данные обновлены", "ok");
     } catch (e) { setStatus(status, "Ошибка: " + e.message, "bad"); }
 }

@@ -131,11 +131,13 @@ test("ученик не может выставлять оценки, выдав
   await assertFails(setDoc(doc(db, "users", "ivan"), Object.assign({ username:"ivan" }, USERS.ivan, { role:"admin" })));
 });
 
-test("сообщения ученика: только от своего имени и разрешённым адресатам", async () => {
+test("сообщения: любому участнику сайта, только от своего имени", async () => {
   const db = as("ivan");
   await assertSucceeds(addDoc(collection(db, "messages"), msg("ivan", "teacher")));
   await assertSucceeds(addDoc(collection(db, "messages"), msg("ivan", "parent_ivan")));
-  await assertFails(addDoc(collection(db, "messages"), msg("ivan", "anna")));
+  await assertSucceeds(addDoc(collection(db, "messages"), msg("ivan", "anna")));             // ученик — ученику
+  await assertFails(addDoc(collection(db, "messages"), msg("ivan", "ivan")));               // себе — нельзя
+  await assertFails(addDoc(collection(db, "messages"), msg("ivan", "nobody")));             // несуществующему — нельзя
   await assertFails(addDoc(collection(db, "messages"), msg("teacher", "ivan")));
   await assertFails(addDoc(collection(db, "messages"), msg("ivan", "teacher", { isRead:true })));
   await assertFails(addDoc(collection(db, "messages"), msg("ivan", "teacher", { text:"x".repeat(2001) })));
@@ -173,13 +175,13 @@ test("родитель не видит чужих детей", async () => {
   await assertFails(getDocs(collection(db, "users")));
 });
 
-test("родитель может отметить задание ребёнка и написать ребёнку или репетитору", async () => {
+test("родитель может отметить задание ребёнка и написать любому участнику", async () => {
   const db = as("parent_ivan");
   await assertSucceeds(updateDoc(doc(db, "homework", "h-ivan"), { status:"done" }));
   await assertFails(updateDoc(doc(db, "homework", "h-anna"), { status:"done" }));
   await assertSucceeds(addDoc(collection(db, "messages"), msg("parent_ivan", "teacher")));
   await assertSucceeds(addDoc(collection(db, "messages"), msg("parent_ivan", "ivan")));
-  await assertFails(addDoc(collection(db, "messages"), msg("parent_ivan", "anna")));
+  await assertSucceeds(addDoc(collection(db, "messages"), msg("parent_ivan", "anna")));
 });
 
 /* ---------- Репетитор ---------- */
@@ -396,4 +398,29 @@ test("аккаунты: репетитор правит имя, падеж и р
   await assertFails(deleteDoc(doc(t, "users", "teacher")));                                // себя — нельзя
   await assertSucceeds(deleteDoc(doc(t, "users", "anna")));
   await assertFails(getDocs(collection(as("ivan"), "users")));
+});
+
+test("сообщения удаляет репетитор (любые) и отправитель (свои); справочник имён", async () => {
+  await assertSucceeds(deleteDoc(doc(as("ivan"), "messages", "from-ivan")));               // своё
+  await assertFails(deleteDoc(doc(as("ivan"), "messages", "to-ivan")));                    // чужое
+  await assertFails(deleteDoc(doc(as("parent_ivan"), "messages", "to-ivan")));
+  await assertSucceeds(deleteDoc(doc(as("teacher"), "messages", "to-anna")));
+  // запрос файлов своего сообщения, как в js/auth.js (filesOf с from)
+  await assertSucceeds(getDocs(query(collection(as("ivan"), "files"), where("kind", "==", "message"), where("from", "==", "ivan"), where("parentId", "==", "x"))));
+  const t = as("teacher");
+  await assertSucceeds(setDoc(doc(t, "directory", "ivan"), { name:"Иван Петров", role:"student" }));
+  await assertFails(setDoc(doc(t, "directory", "ivan"), { name:"Иван", role:"student", uid:"x" }));
+  await assertFails(setDoc(doc(as("ivan"), "directory", "ivan"), { name:"Хакер", role:"admin" }));
+  await assertSucceeds(getDocs(collection(as("anna"), "directory")));
+  await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), "directory")));
+});
+
+test("репетитор правит любые записи теми же проверками", async () => {
+  const t = as("teacher");
+  await assertSucceeds(updateDoc(doc(t, "homework", "h-ivan"), hw("ivan", { title:"Новое название", status:"done", testId:"" })));
+  await assertFails(updateDoc(doc(t, "homework", "h-ivan"), { title:"" }));
+  await assertSucceeds(updateDoc(doc(t, "grades", "g-ivan"), { grade:4, comment:"исправлено" }));
+  await assertFails(updateDoc(doc(t, "grades", "g-ivan"), { grade:7 }));
+  await assertSucceeds(updateDoc(doc(t, "schedule", "e-ivan"), { status:"done", time:"17:30" }));
+  await assertFails(updateDoc(doc(as("ivan"), "grades", "g-ivan"), { grade:5 }));
 });

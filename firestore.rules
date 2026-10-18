@@ -48,7 +48,9 @@ rules_version = '2';
 //   student — читает свои записи (поле student == свой логин), общие материалы/темы/события,
 //             меняет только status своих домашних заданий.
 //   parent  — то же, что его ученик (users.child), плюс свои сообщения.
-//   Сообщения: участник переписки — отправитель/получатель или ученик родителя.
+//   Сообщения: писать можно любому участнику сайта; читают отправитель, получатель и родитель ученика
+//             из переписки; удаляют репетитор (любые) и отправитель (свои).
+// directory/{username}      справочник для выбора адресата: name 1..100, role; читают все участники, пишет репетитор.
 // ===============================================================
 
 service cloud.firestore {
@@ -175,12 +177,9 @@ service cloud.firestore {
     }
 
     // Кому можно писать: админ — всем; остальные — репетитору, своему ребёнку или родителю.
+    // Писать можно любому участнику сайта (ученикам, родителям, репетитору), но не самому себе.
     function canMessage(to) {
-      return exists(userPath(to)) &&
-        (me().role == 'admin' ||
-         get(userPath(to)).data.role == 'admin' ||
-         (me().role == 'parent' && to == me().child) ||
-         get(userPath(to)).data.child == myUsername());
+      return exists(userPath(to)) && to != myUsername();
     }
 
     // ---------- Коллекции ----------
@@ -194,6 +193,15 @@ service cloud.firestore {
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.role == resource.data.role;
       allow delete: if isAdmin() && username != myUsername();
+    }
+
+    // Справочник имён для выбора адресата: логин → имя и роль. Пишет репетитор (сайт сам сверяет его с users).
+    match /directory/{username} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() && login(username) &&
+        hasExactly(request.resource.data, ['name', 'role']) && str(request.resource.data.name, 1, 100) &&
+        request.resource.data.role in ['admin', 'student', 'parent'];
+      allow delete: if isAdmin();
     }
 
     match /materials/{id} {
@@ -398,7 +406,8 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) &&
         request.resource.data.isRead == true &&
         (isAdmin() || (isMyParty(resource.data.to) && resource.data.from != myUsername()));
-      allow delete: if isAdmin();
+      // Удаляет репетитор любое сообщение, остальные — только свои отправленные.
+      allow delete: if isAdmin() || (isMember() && resource.data.from == myUsername());
     }
   }
 }

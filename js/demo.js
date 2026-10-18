@@ -137,6 +137,7 @@ export function createDemoBackend() {
         data.users = db.users.map(publicUser);
         data.files = db.files.slice();
         data.testKeys = Object.assign({}, db.testKeys);
+        data.directory = db.users.map(u => ({ id:u.username, name:u.name, role:u.role }));
         return data;
       }
       const me = db.users.find(u => u.username === user.username);
@@ -157,6 +158,7 @@ export function createDemoBackend() {
         practiceResults:db.practiceResults.filter(r => r.student === student),
         problems:db.problems.slice(),
         testKeys:Object.fromEntries(db.testResults.filter(r => r.student === student).map(r => [r.testId, db.testKeys[r.testId]])),
+        directory:db.users.map(u => ({ id:u.username, name:u.name, role:u.role })),
         files:db.files.filter(f => f.kind === "material" || (f.kind === "homework" && f.student === student) ||
           (f.kind === "message" && (party.includes(f.from) || party.includes(f.to))))
       });
@@ -230,9 +232,9 @@ export function createDemoBackend() {
     },
 
     async markRead(user) {
-      const db = read(), party = [user.username, user.child].filter(Boolean);
+      const db = read();
       let count = 0;
-      db.messages.forEach(m => { if (party.includes(m.to) && m.from !== user.username && !m.isRead) { m.isRead = true; count++; } });
+      db.messages.forEach(m => { if (m.to === user.username && !m.isRead) { m.isRead = true; count++; } });
       write(db);
       return count;
     },

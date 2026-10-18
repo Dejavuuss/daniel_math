@@ -47,7 +47,9 @@ function stage(host, label) {
 }
 // Длина линии нужна CSS-анимации «прорисовки» (.draw).
 function prepDraw(svg) {
-  svg.querySelectorAll(".draw").forEach(p => p.style.setProperty("--len", Math.ceil(p.getTotalLength ? p.getTotalLength() : 1200)));
+  // В скрытом разделе длину линии измерить нельзя — тогда берём запас.
+  const len = p => { try { return Math.ceil(p.getTotalLength()) || 1200; } catch (_) { return 1200; } };
+  svg.querySelectorAll(".draw").forEach(p => p.style.setProperty("--len", len(p)));
 }
 const pts = list => list.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
 const ease = t => (1 - Math.cos(t * Math.PI)) / 2;

@@ -1,15 +1,42 @@
 <!doctype html>
-<html lang="ru" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ru" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Панель репетитора</title>
-<meta name="theme-color" content="#17120f">
-<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme")||"dark"}catch(e){}</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2317120f'/%3E%3Ctext x='32' y='45' font-size='38' text-anchor='middle' fill='%23c9a55a' font-family='Georgia,serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#ffffff">
+<script>document.documentElement.classList.add("js");try{document.documentElement.dataset.theme=localStorage.getItem("tutor_theme_v2")||"light"}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e30613'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='800' text-anchor='middle' fill='%23fff' font-family='Helvetica,Arial,sans-serif'%3E%CE%A3%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css"></head>
-<body class="page-admin">
-<header class="topbar"><div class="container">
-    <div class="brand"><div class="seal" aria-hidden="true">Δ</div><div><h1>Панель репетитора</h1><span class="brand-sub">Математика с репетитором</span></div></div>
+<body class="app page-admin">
+<aside class="sidebar" id="sidebar" aria-label="Разделы">
+    <div class="side-head">
+        <span class="logo" aria-hidden="true">Σ</span>
+        <div class="side-brand"><b>Математика</b><span>Панель репетитора</span></div>
+        <button class="icon-btn side-collapse" id="navToggle" type="button" aria-label="Свернуть панель" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist" aria-orientation="vertical">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="t-overview" data-icon="home">Обзор</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-classes" data-icon="users">Классы</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-materials" data-icon="book">Материалы</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-homework" data-icon="list">Задания</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-tests" data-icon="clipboard">Тесты</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-bank" data-icon="target">Банк задач</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-schedule" data-icon="calendar">Календарь</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-grades" data-icon="chart">Оценки</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-notes" data-icon="note">Заметки</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-payments" data-icon="wallet">Платежи</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-achievements" data-icon="award">Достижения</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-messages" data-icon="chat">Сообщения</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-accounts" data-icon="account">Ученики и родители</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-gallery" data-icon="image">Галерея</button>
+    </nav>
+    <div class="side-foot">Математика с репетитором</div>
+</aside>
+<div class="app-main">
+<header class="topbar"><div class="bar">
+    <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Открыть разделы"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <h1 class="view-title" id="viewTitle">Обзор</h1>
+    <p id="adminStatus" class="status-line top-status" role="status">Загружаем данные…</p>
     <div class="actions">
         <a class="btn" href="dashboard.html">Кабинет ученика</a>
         <button id="themeBtn" class="icon-btn" aria-label="Сменить тему"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
@@ -18,9 +45,10 @@
 </div></header>
 
 <main class="container">
+<section id="t-overview" class="tab-panel active" role="tabpanel" aria-label="Обзор">
 <section class="hall">
     <div>
-        <p class="hall-label">Зал Рафаэля</p>
+        <p class="hall-label">Рафаэль. Афинская школа</p>
         <h2><span class="line"><span id="adminGreeting">Добрый день!</span></span><span class="line"><span>Все ученики — в одной перспективе.</span></span></h2>
         <p class="lede">Выдавайте задания, ставьте оценки и записывайте итоги занятий. Ученики и родители увидят изменения, как только обновят страницу.</p>
         <div class="quote" id="quote"></div>
@@ -31,35 +59,47 @@
             <b>Рафаэль Санти</b>
             <i>Афинская школа</i>
             <span>1509–1511. Фреска, Станца делла Сеньятура, Ватикан</span>
-            <p>Философы и учёные Древней Греции в одном зале: в центре Платон и Аристотель, справа внизу Евклид склонился над чертежом с циркулем. Перспектива фрески разобрана ниже, в этюде.</p>
+            <p>Философы и учёные Древней Греции в одном зале: в центре Платон и Аристотель, справа внизу Евклид склонился над чертежом с циркулем. Схема перспективы — в разделе «Галерея».</p>
         </figcaption>
     </figure>
 </section>
 
-<p id="adminStatus" class="status-line">Загружаем данные…</p>
 <div class="stats-grid">
     <article class="stat-card"><strong id="statStudents">—</strong><span class="label">учеников</span></article>
     <article class="stat-card"><strong id="statHomework">—</strong><span class="label">заданий выдано</span></article>
     <article class="stat-card"><strong id="statMaterials">—</strong><span class="label">материалов в базе</span></article>
     <article class="stat-card"><strong id="statLessons">—</strong><span class="label">занятий проведено</span></article>
 </div>
-
-<nav class="tabs" role="tablist" data-reveal>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="t-classes">Классы</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-materials">Материалы</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-homework">Задания</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-tests">Тесты</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-bank">Банк задач</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-schedule">Календарь</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-grades">Оценки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-notes">Заметки</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-payments">Платежи</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-achievements">Достижения</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-messages">Сообщения</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="t-accounts">Аккаунты</button>
-</nav>
-
-<section id="t-classes" class="tab-panel active card" role="tabpanel">
+<div class="widgets-grid">
+    <section class="widget">
+        <h3 class="widget-title">Занятия сегодня и завтра <a class="more" href="#schedule" data-open="t-schedule">Календарь</a></h3>
+        <div id="ovLessons" class="today-list"></div>
+    </section>
+    <section class="widget">
+        <h3 class="widget-title">Просроченные задания <a class="more" href="#homework" data-open="t-homework">Все задания</a></h3>
+        <div id="ovOverdue"></div>
+    </section>
+    <section class="widget">
+        <h3 class="widget-title">Новые сообщения <a class="more" href="#messages" data-open="t-messages">Открыть</a></h3>
+        <div id="ovMessages"></div>
+    </section>
+    <section class="widget">
+        <h3 class="widget-title">Оплаты <a class="more" href="#payments" data-open="t-payments">Платежи</a></h3>
+        <div id="ovBalance"></div>
+        <p class="chart-caption">Оплачено минус проведённые занятия (с учётом возвратов)</p>
+    </section>
+    <section class="widget">
+        <h3 class="widget-title">Учёный дня <a class="more" href="#gallery" data-open="t-gallery">Вся галерея</a></h3>
+        <div id="dailyScientist"></div>
+    </section>
+    <section class="widget">
+        <h3 class="widget-title">Резервная копия</h3>
+        <p class="muted small">Все данные сайта одним файлом: ученики, задания, оценки, заметки, платежи, сообщения, тесты. Файлы-вложения в копию не входят.</p>
+        <button type="button" id="backupBtn">Скачать копию (JSON)</button>
+    </section>
+</div>
+</section>
+<section id="t-classes" class="tab-panel card" role="tabpanel">
 <div class="section-heading"><h2>Классы</h2><span class="hint">от класса зависят материалы, тесты и тренировка ученика</span></div>
 <p class="form-hint">Выберите класс рядом с именем — сохраняется сразу.</p>
 <div id="l-classes"></div>
@@ -96,6 +136,8 @@
         <div><label for="h-assigned">Дата выдачи</label><input id="h-assigned" name="assigned" type="date" required></div>
         <div><label for="h-due">Сдать до</label><input id="h-due" name="due" type="date" required></div>
     </div>
+    <div data-also-wrap><label>Выдать также другим ученикам (необязательно)</label>
+    <div class="checks" data-also></div></div>
     <label for="h-test">Тест (необязательно)</label><select id="h-test" name="testId"><option value="">Без теста</option></select>
     <p class="form-hint">В списке — тесты для класса выбранного ученика и его личные. После сдачи теста задание отмечается выполненным само.</p>
     <label for="h-link">Ссылка на объяснение</label><input id="h-link" name="link" type="url" placeholder="https://youtube.com/watch?v=…">
@@ -244,19 +286,8 @@
 </section>
 
 <section id="t-messages" class="tab-panel card" role="tabpanel">
-<details class="fold form-fold" data-fold="form-f-messages"><summary><span class="fold-title">Отправить сообщение</span></summary>
-<div class="fold-body">
-<form id="f-messages">
-    <div class="grid2">
-        <div><label for="msgTo">Кому</label><select name="to" id="msgTo" required></select></div>
-    </div>
-    <label for="msg-text">Сообщение</label><textarea id="msg-text" name="text" rows="3" required></textarea>
-    <div class="math-preview" hidden data-preview-for="msg-text"></div>
-    <div data-attach></div>
-    <button class="primary" type="submit">Отправить</button>
-</form>
-</div></details>
-<h2 class="list-title">Все сообщения</h2><div id="l-messages"></div>
+<div class="section-heading"><h2>Сообщения</h2><span class="hint">репетитору, ученикам и родителям</span></div>
+<div id="messenger"></div>
 </section>
 
 <section id="t-accounts" class="tab-panel card" role="tabpanel">
@@ -288,12 +319,13 @@
 </form>
 </div></details>
 
-<p class="form-hint">Пароль видно только при создании — передайте его ученику или родителю. Потом каждый может сменить свой пароль сам: кнопка с ключом в шапке кабинета. Если пароль забыт, сбросить его можно в Firebase Console → Authentication.</p>
+<p class="form-hint">Имя, класс и родителя ученика можно изменить в его карточке ниже: нажмите на имя. Пароль видно только при создании — передайте его ученику или родителю. Потом каждый может сменить свой пароль сам: кнопка с ключом в шапке кабинета. Если пароль забыт, сбросить его можно в Firebase Console → Authentication.</p>
 <h2 class="list-title">Ученики</h2><p class="form-hint">Нажмите на имя, чтобы изменить данные или удалить аккаунт.</p><div id="l-students"></div>
 <h2 class="list-title">Родители</h2><div id="l-parents"></div>
 </section>
-<div id="gallery" class="gallery"></div>
+<section id="t-gallery" class="tab-panel" role="tabpanel" aria-label="Галерея"><div id="gallery" class="gallery"></div></section>
 </main>
+</div>
 <script type="module" src="js/admin.js"></script>
 <script type="module" src="js/assistant.js"></script>
 </body></html>

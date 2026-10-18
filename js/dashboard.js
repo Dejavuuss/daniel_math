@@ -1,8 +1,9 @@
 import { requireAuth, apiGet, apiPost, logout, today } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { QUOTES } from "./art.js";
-import { mountHall, mountGallery } from "./gallery.js";
-import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel } from "./ui.js";
+import { mountHall, mountGallery, scientistOfDay, galleryTeaser } from "./gallery.js";
+import { mountMessenger, trackUnread } from "./messages.js";
+import { esc, byDate, fmtDate, daysUntil, average, showToast, setStatus, initTabs, mountStats, gradeBars, medallions, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel, openTab } from "./ui.js";
 import { renderCalendar } from "./calendar.js";
 import { attachmentsHtml, bindAttachments, bindSolutionUploads, solutionButtonHtml, filesFor } from "./files.js";
 import { autoTypeset } from "./math.js";
@@ -21,6 +22,12 @@ mountGallery(document.getElementById("gallery"), "student");
 rotateQuotes(document.getElementById("quote"), QUOTES.student);
 document.getElementById("logoutBtn").onclick = logout;
 mountPasswordButton();
+document.getElementById("dailyScientist").innerHTML = scientistOfDay();
+document.getElementById("galleryTeaser").innerHTML = galleryTeaser();
+const messenger = mountMessenger(document.getElementById("messenger"), {
+    me:currentUser && currentUser.username, isAdmin:currentUser && currentUser.role === "admin", getState:() => state, reload:() => loadData()
+});
+const updateUnread = trackUnread("t-messages", { me:currentUser && currentUser.username, getState:() => state, onRead:() => renderMessages() });
 if (currentUser) {
     document.getElementById("greeting").textContent = `Привет, ${currentUser.name.split(" ")[0] || currentUser.name}!`;
     if (currentUser.role === "admin") document.getElementById("adminLink").hidden = false;
@@ -32,11 +39,10 @@ const filesHtml = (kind, id) => attachmentsHtml(filesFor(state.files, kind, id),
     canDelete:f => f.owner === currentUser.username,
     note:f => kind === "homework" && f.owner === currentUser.username ? "твоё решение" : ""
 });
-const nameOf = u => (state.users.find(x => x.username === u) || {}).name || u;
+const nameOf = u => ((state.directory || []).find(d => d.id === u) || state.users.find(x => x.username === u) || {}).name || u;
 // Класс берём из свежих данных: его мог поменять репетитор.
 const myGrade = () => isStudent ? ((state.users.find(u => u.username === currentUser.username) || currentUser).grade ?? "") : "";
 const myGrades = () => gradeRecords(state, isStudent ? currentUser.username : "");
-const openTab = id => document.querySelector(`.tab[data-tab="${id}"]`)?.click();
 
 async function loadData() {
     const status = document.getElementById("loadStatus");
@@ -52,6 +58,8 @@ async function loadData() {
         renderAchievements();
         renderDeadlines();
         renderMessages();
+        messenger.render();
+        updateUnread();
         const events = state.schedule.filter(ev => !ev.student || ev.student === currentUser.username);
         events.push(...state.homework.filter(h => h.student === currentUser.username && h.due)
             .map(h => ({ date:String(h.due).slice(0, 10), time:"", type:"deadline", title:"Дедлайн: " + h.title, description:"" })));
@@ -114,7 +122,7 @@ function renderDeadlines() {
     }).join("");
 }
 
-async function renderMessages() {
+function renderMessages() {
     const box = document.getElementById("messagesList");
     const mine = state.messages.filter(m => m.to === currentUser.username || m.from === currentUser.username).sort(byDate).slice(-5);
     const unread = mine.filter(m => m.to === currentUser.username && !m.isRead).length;
@@ -123,9 +131,6 @@ async function renderMessages() {
     badge.hidden = unread === 0;
     if (!mine.length) { box.innerHTML = '<p class="muted small">Сообщений пока нет.</p>'; return; }
     box.innerHTML = mine.slice().reverse().map(m => messageHtml(m, currentUser.username, nameOf, filesHtml("message", m.id))).join("");
-    if (unread > 0) {
-        try { await apiPost({ action:"markMessagesRead" }); } catch (_) {}
-    }
 }
 
 function renderLessonNotes() {

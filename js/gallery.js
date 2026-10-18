@@ -23,7 +23,6 @@ const HALL = {
 export function mountHall(frame, name) {
   const a = HALL[name];
   if (!frame || !a) return;
-  frame.classList.add("gilt");
   frame.innerHTML = `<div class="mat"><div class="canvas"><img src="img/${a.src}" width="${a.w}" height="${a.h}" alt="${esc(a.alt)}" decoding="async" fetchpriority="high"></div></div>`;
 }
 
@@ -79,34 +78,39 @@ const MODERN = {
     text:"Треугольники, трапеции и параллелограммы лежат друг на друге, будто плоскости в пространстве. Это стереометрия, написанная на плоском холсте." }
 };
 
-const PAGES = {
-  login:{ art:"vitruvian", scientists:["euler", "kovalevskaya", "einstein", "lovelace"], modern:["kandinsky-8", "malevich", "mondrian"] },
-  student:{ art:"melencolia", scientists:["newton", "gauss", "ramanujan", "lobachevsky"], modern:["kandinsky-circles", "klee", "lissitzky"] },
-  parent:{ art:"wave", scientists:["curie", "noether", "poincare", "hilbert"], modern:["delaunay", "afklint", "popova"] },
-  admin:{ art:"athens", scientists:["gauss", "hilbert", "curie", "euler"], modern:["popova", "kandinsky-circles", "malevich"] }
+const PAGE_ART = { login:"vitruvian", student:"melencolia", parent:"wave", admin:"athens" };
+const HALL_INFO = {
+  vitruvian:{ artist:"Леонардо да Винчи", title:"Витрувианский человек", info:"Около 1490. Перо, тушь. Галерея Академии, Венеция" },
+  melencolia:{ artist:"Альбрехт Дюрер", title:"Меланхолия I", info:"1514. Гравюра на меди. Метрополитен-музей, Нью-Йорк" },
+  wave:{ artist:"Кацусика Хокусай", title:"Большая волна в Канагаве", info:"Около 1831. Цветная ксилография" },
+  athens:{ artist:"Рафаэль Санти", title:"Афинская школа", info:"1509–1511. Фреска. Ватикан" }
 };
 
 const img = (o, cls = "") => `<img${cls ? ` class="${cls}"` : ""} src="img/${o.src}" width="${o.w}" height="${o.h}" alt="" loading="lazy" decoding="async">`;
+const sourceLink = o => `<li><a href="${COMMONS + encodeURIComponent(o.file.replace(/ /g, "_"))}" target="_blank" rel="noopener noreferrer">${esc(o.name || o.title || o.alt)}</a></li>`;
 
+// Полная экспозиция — одинаковая для всех: шедевры со схемами, все учёные, весь зал XX века.
+// Картина текущей страницы идёт первой.
 export function mountGallery(host, page) {
-  const p = PAGES[page];
-  if (!host || !p) return;
-  const hall = HALL[p.art];
-  const scientists = p.scientists.map(k => SCIENTISTS[k]), modern = p.modern.map(k => MODERN[k]);
-  const sources = [hall, ...scientists, ...modern].map(o => `<li><a href="${COMMONS + encodeURIComponent(o.file.replace(/ /g, "_"))}" target="_blank" rel="noopener noreferrer">${esc(o.name || o.title || o.alt)}</a></li>`).join("");
+  if (!host) return;
+  const first = PAGE_ART[page] || "vitruvian";
+  const halls = [first, ...Object.keys(HALL).filter(k => k !== first)];
+  const scientists = Object.values(SCIENTISTS), modern = Object.values(MODERN);
   host.innerHTML = `
-  <section class="gallery-room study-room" data-reveal>
-    <div class="room-head"><p class="hall-label">Этюд</p><h2>Математика картины</h2></div>
-    <div class="study">
-      <figure class="study-frame"><div class="frame" id="study-art"></div></figure>
-      <p class="study-text">${esc(hall.study)}</p>
-    </div>
+  <section class="gallery-room">
+    <div class="room-head"><h2>Шедевры и их математика</h2><p>Четыре картины, в которых спрятана геометрия. Рядом — живая схема: её можно рассматривать, наводить и двигать.</p></div>
+    ${halls.map(k => { const h = HALL[k], t = HALL_INFO[k]; return `
+    <article class="masterpiece">
+      <div class="mp-img">${img(h)}</div>
+      <div class="mp-study"><div class="study"><div class="frame" data-study="${k}"></div></div></div>
+      <div class="mp-text"><b>${esc(t.artist)}</b><i>${esc(t.title)}</i><span>${esc(t.info)}</span><p>${esc(h.study)}</p></div>
+    </article>`; }).join("")}
   </section>
 
-  <section class="gallery-room" data-reveal>
-    <div class="room-head"><p class="hall-label">Портретная галерея</p><h2>Те, кто придумал математику</h2></div>
-    <div class="portraits">${scientists.map((s, i) => `
-      <figure class="portrait" data-reveal="${i}">
+  <section class="gallery-room">
+    <div class="room-head"><h2>Те, кто придумал математику</h2><p>Двенадцать учёных: от Ньютона и Эйлера до Нётер и Рамануджана. Наведите на портрет, чтобы увидеть его в цвете.</p></div>
+    <div class="portraits">${scientists.map(s => `
+      <figure class="portrait">
         <div class="photo">${img(s)}</div>
         <figcaption>
           <b>${esc(s.name)}</b><span class="years">${esc(s.years)}</span>
@@ -118,20 +122,43 @@ export function mountGallery(host, page) {
     </div>
   </section>
 
-  <section class="gallery-room" data-reveal>
-    <div class="room-head"><p class="hall-label">Зал XX века</p><h2>Геометрия в современном искусстве</h2></div>
-    ${modern.map((m, i) => `
-    <figure class="modern${i % 2 ? " flip" : ""}" data-reveal>
+  <section class="gallery-room">
+    <div class="room-head"><h2>Геометрия в искусстве XX века</h2><p>Кандинский, Малевич, Мондриан и другие строили картины из точек, линий, кругов и прямоугольников.</p></div>
+    <div class="art-grid">${modern.map(m => `
+    <figure class="modern">
       <div class="modern-frame">${img(m)}</div>
       <figcaption class="placard">
         <b>${esc(m.artist)}</b><i>${esc(m.title)}</i><span>${esc(m.info)}</span>
         <p>${esc(m.text)}</p>
       </figcaption>
     </figure>`).join("")}
+    </div>
   </section>
 
   <details class="fold sources"><summary><span class="fold-title">Источники изображений</span><span class="fold-note">Wikimedia Commons, общественное достояние</span></summary>
-    <div class="fold-body"><ul>${sources}</ul></div></details>`;
-  mountArt(host.querySelector("#study-art"), p.art);
+    <div class="fold-body"><ul>${[...halls.map(k => HALL[k]), ...scientists, ...modern].map(sourceLink).join("")}</ul></div></details>`;
+  // Схемы рисуются, когда их видно (галерея — отдельный раздел, сначала скрыт).
+  const studies = host.querySelectorAll("[data-study]");
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(entries => entries.forEach(en => {
+      if (en.isIntersecting) { io.unobserve(en.target); mountArt(en.target, en.target.dataset.study); }
+    }));
+    studies.forEach(el => io.observe(el));
+  } else studies.forEach(el => mountArt(el, el.dataset.study));
   reveal(host);
+}
+
+// Учёный дня для обзора: меняется раз в сутки, у всех один и тот же.
+export function scientistOfDay(date = new Date()) {
+  const list = Object.values(SCIENTISTS);
+  const day = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+  const s = list[day % list.length];
+  return `<div class="daily">${img(s)}<div><b>${esc(s.name)}</b><span>${esc(s.years)}</span><p>${esc(s.text)}</p></div></div>`;
+}
+
+// Полоска портретов для обзора (ведёт в галерею).
+export function galleryTeaser(n = 4, date = new Date()) {
+  const all = [...Object.values(SCIENTISTS), ...Object.values(MODERN)];
+  const start = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000) % all.length;
+  return `<div class="gallery-teaser">${Array.from({ length:n }, (_, i) => all[(start + i * 5) % all.length]).map(o => img(o)).join("")}</div>`;
 }

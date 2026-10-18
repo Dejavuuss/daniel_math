@@ -1,8 +1,9 @@
 import { requireAuth, apiGet, apiPost, logout, today, DEMO } from "./auth.js";
 import { initPage, countUp, rotateQuotes } from "./fx.js";
 import { QUOTES } from "./art.js";
-import { mountHall, mountGallery } from "./gallery.js";
-import { esc, byDate, fmtDate, average, showToast, setStatus, initTabs, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel, genitive } from "./ui.js";
+import { mountHall, mountGallery, scientistOfDay } from "./gallery.js";
+import { mountMessenger, trackUnread } from "./messages.js";
+import { esc, byDate, fmtDate, average, showToast, setStatus, initTabs, noteHtml, messageHtml, fold, groupBy, monthOf, classLabel, genitive, openTab } from "./ui.js";
 import { createPicker, attach, attachmentsHtml, bindAttachments, filesFor } from "./files.js";
 import { autoTypeset, mathPreview } from "./math.js";
 import { mountTestBuilder } from "./test-builder.js";
@@ -20,6 +21,11 @@ mountGallery(document.getElementById("gallery"), "admin");
 rotateQuotes(document.getElementById("quote"), QUOTES.admin);
 document.getElementById("logoutBtn").onclick = logout;
 mountPasswordButton();
+document.getElementById("dailyScientist").innerHTML = scientistOfDay();
+const messenger = mountMessenger(document.getElementById("messenger"), {
+    me:adminUser && adminUser.username, isAdmin:true, getState:() => state, reload:() => loadData()
+});
+const updateUnread = trackUnread("t-messages", { me:adminUser && adminUser.username, getState:() => state, onRead:() => renderOverview() });
 if (adminUser) document.getElementById("adminGreeting").textContent = greeting() + ", " + adminUser.name.split(" ")[0] + "!";
 autoTypeset(document.querySelector("main"));
 document.querySelectorAll("[data-preview-for]").forEach(out => mathPreview(document.getElementById(out.dataset.previewFor), out));
@@ -38,6 +44,10 @@ async function loadData() {
         state = await apiGet();
         fillStudents();
         renderLists();
+        renderOverview();
+        messenger.render();
+        updateUnread();
+        reapplySearch();
         countUp(document.getElementById("statStudents"), state.users.filter(u => u.role === "student").length);
         countUp(document.getElementById("statHomework"), state.homework.length);
         countUp(document.getElementById("statMaterials"), state.materials.length);
@@ -56,11 +66,10 @@ function fillStudents() {
         if (keep) el.value = keep;
     });
     fillHomeworkTests();
-    document.getElementById("msgTo").innerHTML = state.users.filter(u => u.role !== "admin")
-        .map(u => `<option value="${esc(u.username)}">${esc(u.name)} — ${u.role === "parent" ? "родитель" : "ученик"}</option>`).join("");
+    fillAlsoStudents();
 }
 
-const nameOf = u => (state.users.find(x => x.username === u) || {}).name || u;
+const nameOf = u => ((state.directory || []).find(d => d.id === u) || state.users.find(x => x.username === u) || {}).name || u;
 const KIND = { materials:"material", homework:"homework", messages:"message" };
 // Файлы записи; у решений, загруженных учеником или родителем, — подпись «от …».
 const filesCell = (kind, id) => attachmentsHtml(filesFor(state.files, kind, id), {
@@ -73,6 +82,9 @@ const CLASS_ORDER = [...Array.from({ length:11 }, (_, i) => String(i + 1)), ""];
 const recent = list => list.slice().sort(byDate).reverse();
 const delBtn = (collection, id, confirmText) => `<button class="danger" data-delete-sheet="${collection}" data-delete-id="${esc(id)}"${confirmText ? ` data-confirm="${esc(confirmText)}"` : ""}>Удалить</button>`;
 const empty = text => `<p class="muted">${text}</p>`;
+const EDITABLE = ["materials", "homework", "schedule", "grades", "lessonNotes", "payments", "achievements", "problems"];
+const editBtn = (collection, id) => EDITABLE.includes(collection) ? `<button type="button" class="ghost" data-edit-sheet="${collection}" data-edit-id="${esc(id)}">Изменить</button>` : "";
+const rowActions = (collection, id) => `<div class="row-actions">${editBtn(collection, id)}${delBtn(collection, id)}</div>`;
 
 function table(rows, fields, collection) {
     if (!rows.length) return '<p class="empty-note">Записей пока нет.</p>';
@@ -82,9 +94,9 @@ function table(rows, fields, collection) {
         : f === "student" || f === "child" ? esc(nameOf(r[f]))
         : f === "date" || f === "assigned" || f === "due" ? esc(fmtDate(r[f]))
         : f === "testId" ? esc((state.tests.find(t => t.id === r.testId) || {}).title || "")
-        : f === "status" ? (r.status === "done" ? '<span class="badge done">сделано</span>' : '<span class="badge pending">в работе</span>')
+        : f === "status" ? ({ done:'<span class="badge done">сделано</span>', cancelled:'<span class="badge plain">отменено</span>', planned:'<span class="badge info">запланировано</span>' }[r.status] || '<span class="badge pending">в работе</span>')
         : esc(r[f]);
-    return `<div class="table-wrap"><table><thead><tr>${fields.map(f => `<th>${f[1]}</th>`).join("")}${collection ? "<th></th>" : ""}</tr></thead><tbody>${rows.map(r => `<tr>${fields.map(f => `<td>${cell(r, f[0])}</td>`).join("")}${collection ? `<td>${delBtn(collection, r.id)}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="table-wrap"><table><thead><tr>${fields.map(f => `<th>${f[1]}</th>`).join("")}${collection ? "<th></th>" : ""}</tr></thead><tbody>${rows.map(r => `<tr>${fields.map(f => `<td>${cell(r, f[0])}</td>`).join("")}${collection ? `<td class="cell-actions">${rowActions(collection, r.id)}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 
 // Группы по ученику: [[username, записи]] в алфавитном порядке имён, затем остальные.
@@ -109,7 +121,7 @@ function renderLists() {
         }).join("")
         : empty("Заданий пока нет.");
 
-    const evFields = [["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"]];
+    const evFields = [["date","Дата"],["time","Время"],["type","Тип"],["title","Событие"],["student","Ученик"],["status","Статус"]];
     const upcoming = state.schedule.filter(e => String(e.date).slice(0, 10) >= now).sort(byDate), past = recent(state.schedule.filter(e => String(e.date).slice(0, 10) < now));
     document.getElementById("l-schedule").innerHTML = state.schedule.length
         ? fold("a-ev-next", "Предстоящие", table(upcoming, evFields, "schedule"), { open:true, count:upcoming.length })
@@ -121,7 +133,7 @@ function renderLists() {
     document.getElementById("l-notes").innerHTML = state.lessonNotes.length
         ? byStudent(recent(state.lessonNotes)).map(([u, items]) => fold("a-notes-" + u, studentTitle(u),
             groupBy(items, n => monthOf(n.date)).map(([month, list]) => fold(`a-notes-${u}-${month}`, esc(month),
-                list.map(n => noteHtml(n).replace("</article>", `${delBtn("lessonNotes", n.id)}</article>`)).join(""), { count:list.length })).join(""),
+                list.map(n => noteHtml(n).replace("</article>", `${rowActions("lessonNotes", n.id)}</article>`)).join(""), { count:list.length })).join(""),
             { count:items.length, note:"последнее " + fmtDate(items[0].date) })).join("")
         : empty("Заметок пока нет.");
 
@@ -134,19 +146,8 @@ function renderLists() {
         : empty("Платежей пока нет.");
 
     document.getElementById("l-achievements").innerHTML = state.achievements.length
-        ? byStudent(recent(state.achievements)).map(([u, items]) => fold("a-ach-" + u, studentTitle(u), items.map(a => `<article class="item"><div class="row"><h3>${esc(a.icon || "🏆")} ${esc(a.title)}</h3><span class="muted small">${esc(fmtDate(a.date))}</span></div>${a.description ? `<p class="muted">${esc(a.description)}</p>` : ""}${delBtn("achievements", a.id)}</article>`).join(""), { count:items.length })).join("")
+        ? byStudent(recent(state.achievements)).map(([u, items]) => fold("a-ach-" + u, studentTitle(u), items.map(a => `<article class="item"><div class="row"><h3>${esc(a.icon || "🏆")} ${esc(a.title)}</h3><span class="muted small">${esc(fmtDate(a.date))}</span></div>${a.description ? `<p class="muted">${esc(a.description)}</p>` : ""}${rowActions("achievements", a.id)}</article>`).join(""), { count:items.length })).join("")
         : empty("Достижений пока нет.");
-
-    // Сообщения — по собеседникам; переписки с непрочитанными открыты.
-    const partner = m => m.from === adminUser.username ? m.to : m.from;
-    const order = state.users.filter(u => u.role !== "admin").sort((a, b) => a.name.localeCompare(b.name, "ru")).map(u => u.username);
-    document.getElementById("l-messages").innerHTML = state.messages.length
-        ? groupBy(recent(state.messages), partner, order).map(([u, items]) => {
-            const unread = items.filter(m => m.to === adminUser.username && !m.isRead).length;
-            return fold("a-msg-" + u, esc(nameOf(u)), items.map(m => messageHtml(m, adminUser.username, nameOf, filesCell("message", m.id))).join(""),
-                { count:items.length, note:unread ? `новых ${unread}` : "последнее " + fmtDate(items[0].date), open:unread > 0 });
-        }).join("")
-        : empty("Сообщений пока нет.");
 
     renderAccounts();
 
@@ -241,10 +242,18 @@ function renderClasses() {
         fold("a-class-" + (g || "none"), g ? `${esc(g)} класс` : "Класс не указан", items.map(u => {
             const parent = state.users.find(x => x.role === "parent" && x.child === u.username);
             return `<div class="class-row"><div class="who">${esc(u.name)}<small>${esc(u.username)}${parent ? ", родитель: " + esc(parent.name) : ""}</small></div>
-                <select data-set-grade="${esc(u.username)}" aria-label="Класс ученика">${options(u.grade)}</select></div>`;
+                <select data-set-grade="${esc(u.username)}" aria-label="Класс ученика">${options(u.grade)}</select>
+                <button type="button" class="ghost" data-edit-account="${esc(u.username)}">Изменить имя и данные</button></div>`;
         }).join(""), { open:true, count:items.length })).join("");
 }
 
+document.getElementById("l-classes").addEventListener("click", e => {
+    const b = e.target.closest("[data-edit-account]");
+    if (!b) return;
+    openTab("t-accounts");
+    const d = document.querySelector(`details[data-fold="a-acc-${CSS.escape(b.dataset.editAccount)}"]`);
+    if (d) { d.open = true; d.scrollIntoView({ block:"start" }); d.querySelector("input[name=name]")?.focus(); }
+});
 document.getElementById("l-classes").addEventListener("change", async e => {
     const sel = e.target.closest("[data-set-grade]");
     if (!sel) return;
@@ -314,7 +323,7 @@ function renderProblems() {
             <div class="row"><span class="difficulty" aria-label="Сложность ${p.difficulty} из 3">${"●".repeat(p.difficulty)}${"○".repeat(3 - p.difficulty)}</span></div>
             <div class="problem-text">${esc(p.text)}</div>
             <p class="muted small">Ответ: ${esc(p.answer)}</p>
-            ${delBtn("problems", p.id)}
+            ${rowActions("problems", p.id)}
         </article>`).join(""), { count:items.length })).join(""), { count:list.length, note:`тем: ${byTopic.length}` });
     }).join("");
 }
@@ -333,7 +342,8 @@ document.getElementById("studentSelect").addEventListener("change", fillHomework
 function formData(form) { const o = {}; new FormData(form).forEach((v, k) => { o[k] = v; }); return o; }
 
 // files — {kind, extra(data)}: после сохранения записи прикрепить выбранные файлы.
-function submitForm(id, action, done, files) {
+// also(form) — ещё ученики: та же запись (с теми же файлами) создаётся и для них.
+function submitForm(id, action, done, files, also) {
     const form = document.getElementById(id);
     const picker = files ? createPicker(form.querySelector("[data-attach]")) : null;
     form.addEventListener("submit", async e => {
@@ -343,12 +353,17 @@ function submitForm(id, action, done, files) {
         let saved = false;
         try {
             const data = formData(form);
-            const res = await apiPost(Object.assign({ action }, data));
-            saved = true;
-            if (picker && picker.files().length) {
-                button.textContent = "Загружаем файлы…";
-                await attach(files.kind, res.item.id, picker.files(), files.extra ? files.extra(data) : {});
+            delete data.also;
+            const targets = [data, ...(also ? also(form).map(student => Object.assign({}, data, { student })) : [])];
+            for (const d of targets) {
+                const res = await apiPost(Object.assign({ action }, d));
+                saved = true;
+                if (picker && picker.files().length) {
+                    button.textContent = "Загружаем файлы…";
+                    await attach(files.kind, res.item.id, picker.files(), files.extra ? files.extra(d) : {});
+                }
             }
+            if (targets.length > 1) done += ` (учеников: ${targets.length})`;
             form.reset();
             if (picker) picker.clear();
             await loadData();
@@ -362,13 +377,13 @@ function submitForm(id, action, done, files) {
 }
 
 submitForm("f-materials", "addMaterial", "Материал сохранён", { kind:"material" });
-submitForm("f-homework", "addHomework", "Задание выдано", { kind:"homework", extra:d => ({ student:d.student }) });
+submitForm("f-homework", "addHomework", "Задание выдано", { kind:"homework", extra:d => ({ student:d.student }) },
+    form => [...form.querySelectorAll("[data-also] input:checked")].map(i => i.value));
 submitForm("f-schedule", "addEvent", "Событие добавлено");
 submitForm("f-grades", "addGrade", "Оценка сохранена");
 submitForm("f-notes", "addLessonNote", "Заметка сохранена");
 submitForm("f-payments", "addPayment", "Запись добавлена");
 submitForm("f-achievements", "addAchievement", "Достижение выдано");
-submitForm("f-messages", "addMessage", "Сообщение отправлено", { kind:"message", extra:d => ({ from:adminUser.username, to:d.to }) });
 submitForm("f-students", "addStudent", "Аккаунт ученика создан");
 submitForm("f-problems", "addProblem", "Задача добавлена");
 
@@ -389,7 +404,167 @@ testForm.addEventListener("submit", async e => {
 });
 submitForm("f-parents", "addParent", "Аккаунт родителя создан");
 
-["l-materials", "l-homework", "l-messages"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));
+["l-materials", "l-homework"].forEach(id => bindAttachments(document.getElementById(id), () => state.files, loadData));
+
+
+/* ---------- Обзор дня ---------- */
+
+const shiftDay = (d, n) => { const t = new Date(d + "T12:00:00"); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
+function renderOverview() {
+    const now = today(), tomorrow = shiftDay(now, 1);
+    const lessons = state.schedule.filter(e => e.date === now || e.date === tomorrow)
+        .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+    document.getElementById("ovLessons").innerHTML = lessons.length ? lessons.map(e => `<div class="item compact"><time>${esc(e.time || "весь день")}</time>
+        <div><b>${esc(e.title)}</b><div class="muted small">${e.date === now ? "сегодня" : "завтра"}, ${e.student ? esc(nameOf(e.student)) : "все ученики"}</div></div></div>`).join("")
+        : '<p class="empty-note">На сегодня и завтра в календаре ничего нет.</p>';
+    const overdue = state.homework.filter(h => h.status !== "done" && String(h.due).slice(0, 10) < now).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+    document.getElementById("ovOverdue").innerHTML = overdue.length ? overdue.slice(0, 6).map(h => `<div class="item compact"><div class="row">
+        <span><b>${esc(nameOf(h.student))}</b>: ${esc(h.title)}</span><span class="badge overdue">до ${esc(fmtDate(h.due))}</span></div></div>`).join("")
+        + (overdue.length > 6 ? `<p class="muted small">И ещё ${overdue.length - 6}.</p>` : "")
+        : '<p class="empty-note">Просроченных заданий нет.</p>';
+    const unread = state.messages.filter(m => m.to === adminUser.username && !m.isRead).sort(byDate).reverse();
+    document.getElementById("ovMessages").innerHTML = unread.length ? unread.slice(0, 4).map(m => `<div class="item compact"><b>${esc(nameOf(m.from))}</b>
+        <div class="muted small">${esc(String(m.text).slice(0, 120))}${String(m.text).length > 120 ? "…" : ""}</div></div>`).join("")
+        : '<p class="empty-note">Новых сообщений нет.</p>';
+    const balances = students().map(u => {
+        const sum = type => state.payments.filter(p => p.student === u.username && p.type === type).reduce((s, p) => s + Number(p.amount || 0), 0);
+        return { u, balance:sum("paid") - sum("refund") - sum("lesson") };
+    }).filter(x => state.payments.some(p => p.student === x.u.username));
+    document.getElementById("ovBalance").innerHTML = balances.length ? balances.map(({ u, balance }) => `<div class="item compact"><div class="row">
+        <span>${esc(u.name)}</span><span class="${balance < 0 ? "balance-neg" : "balance-pos"}">${balance > 0 ? "+" : ""}${balance.toLocaleString("ru-RU")} ₽</span></div></div>`).join("")
+        : '<p class="empty-note">Платежей пока нет.</p>';
+}
+
+document.getElementById("backupBtn").addEventListener("click", () => {
+    if (!state) return;
+    const data = Object.assign({ exportedAt:new Date().toISOString() }, state);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type:"application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `math-backup-${today()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast("Копия скачана");
+});
+
+/* ---------- Правка записей ---------- */
+
+// Окно правки собирается из той же формы, что и добавление: поля и проверки одинаковые.
+const EDIT_FORMS = { materials:"f-materials", homework:"f-homework", schedule:"f-schedule", grades:"f-grades", lessonNotes:"f-notes",
+    payments:"f-payments", achievements:"f-achievements", problems:"f-problems" };
+const STATUS_OPTIONS = {
+    homework:[["pending", "В работе"], ["done", "Сделано"]],
+    schedule:[["planned", "Запланировано"], ["done", "Проведено"], ["cancelled", "Отменено"]]
+};
+const editDlg = document.createElement("dialog");
+editDlg.className = "dialog";
+document.body.appendChild(editDlg);
+
+function openEdit(sheet, id) {
+    const rec = (state[sheet] || []).find(r => String(r.id) === String(id));
+    const src = document.getElementById(EDIT_FORMS[sheet]);
+    if (!rec || !src) return;
+    const form = src.cloneNode(true);
+    form.removeAttribute("id");
+    form.className = "dialog-form";
+    form.noValidate = true;
+    form.querySelectorAll("[data-attach], .math-preview, [data-also-wrap], .math-hint").forEach(el => el.remove());
+    form.querySelectorAll("[id]").forEach(el => { el.id = "edit-" + el.id; });
+    form.querySelectorAll("label[for]").forEach(l => { l.htmlFor = "edit-" + l.htmlFor; });
+    if (STATUS_OPTIONS[sheet]) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `<label for="edit-status">Статус</label><select id="edit-status" name="status">${STATUS_OPTIONS[sheet].map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>`;
+        form.querySelector('button[type="submit"]').before(...wrap.childNodes);
+    }
+    // В форме добавления список тестов отфильтрован по выбранному ученику — в окне правки нужны все.
+    const testSel = form.querySelector('select[name="testId"]');
+    if (testSel) testSel.innerHTML = '<option value="">Без теста</option>' + state.tests.map(t => `<option value="${esc(t.id)}">${esc(t.title)}</option>`).join("");
+    form.querySelectorAll("[name]").forEach(el => {
+        const v = rec[el.name];
+        el.value = v == null ? "" : String(v);
+    });
+    const submit = form.querySelector('button[type="submit"]');
+    submit.textContent = "Сохранить изменения";
+    const actions = document.createElement("div");
+    actions.className = "form-actions";
+    actions.innerHTML = '<button type="button" data-close>Отмена</button>';
+    submit.replaceWith(actions);
+    actions.appendChild(submit);
+    form.insertAdjacentHTML("afterbegin", '<h3>Изменить запись</h3>');
+    editDlg.innerHTML = "";
+    editDlg.appendChild(form);
+    form.querySelectorAll("[data-preview-for]").forEach(out => mathPreview(form.querySelector("#" + out.dataset.previewFor), out));
+    actions.querySelector("[data-close]").onclick = () => editDlg.close();
+    form.addEventListener("submit", async e => {
+        e.preventDefault();
+        submit.disabled = true; submit.textContent = "Сохраняем…";
+        try {
+            await apiPost(Object.assign({ action:"updateRow", sheet, id }, formData(form)));
+            editDlg.close();
+            await loadData();
+            showToast("Изменения сохранены");
+        } catch (err) { submit.disabled = false; submit.textContent = "Сохранить изменения"; showToast("Не удалось сохранить: " + err.message, true); }
+    });
+    editDlg.showModal();
+    form.querySelector("input:not([type=hidden]), select, textarea")?.focus();
+}
+document.querySelector("main").addEventListener("click", e => {
+    const b = e.target.closest("[data-edit-sheet]");
+    if (b) openEdit(b.dataset.editSheet, b.dataset.editId);
+});
+
+/* ---------- Поиск в разделах ---------- */
+
+const LEAVES = "tbody tr:not(.answers-row), .item, .lesson-note, .message, .class-row";
+function applySearch(panel) {
+    const input = panel.querySelector(".panel-search input");
+    if (!input) return;
+    const q = input.value.trim().toLowerCase();
+    const scope = [...panel.children].filter(el => !el.classList.contains("panel-search") && !el.classList.contains("form-fold"));
+    const leaves = scope.flatMap(el => [...el.querySelectorAll(LEAVES)]);
+    leaves.forEach(el => el.classList.toggle("search-hide", !!q && !el.textContent.toLowerCase().includes(q)));
+    const folds = scope.flatMap(el => [...el.querySelectorAll("details.fold:not(.form-fold)")]).reverse();
+    folds.forEach(d => {
+        if (!q) { d.classList.remove("search-hide"); return; }
+        const title = d.querySelector(":scope > summary").textContent.toLowerCase().includes(q);
+        const visible = [...d.querySelectorAll(LEAVES)].some(el => !el.classList.contains("search-hide"));
+        d.classList.toggle("search-hide", !title && !visible);
+        if (visible && !d.open) d.open = true;
+    });
+    const count = panel.querySelector(".search-count");
+    count.textContent = q ? `найдено: ${leaves.filter(el => !el.classList.contains("search-hide")).length}` : "";
+}
+document.querySelectorAll("main > .tab-panel").forEach(panel => {
+    if (["t-overview", "t-gallery", "t-messages"].includes(panel.id)) return;
+    const bar = document.createElement("div");
+    bar.className = "panel-search";
+    bar.innerHTML = '<input type="search" placeholder="Поиск в разделе: имя, тема, текст…" aria-label="Поиск в разделе"><span class="search-count"></span>';
+    panel.prepend(bar);
+    bar.querySelector("input").addEventListener("input", () => applySearch(panel));
+});
+const reapplySearch = () => document.querySelectorAll("main > .tab-panel").forEach(applySearch);
+
+/* ---------- Задание сразу нескольким ученикам ---------- */
+
+function fillAlsoStudents() {
+    const box = document.querySelector("[data-also]");
+    if (!box) return;
+    const main = document.getElementById("studentSelect").value;
+    const checked = new Set([...box.querySelectorAll("input:checked")].map(i => i.value));
+    const list = students().filter(u => u.username !== main);
+    const grades = [...new Set(list.map(u => u.grade).filter(Boolean))].sort((a, b) => a - b);
+    box.innerHTML = list.length ? `<div class="checks-tools">${grades.map(g => `<button type="button" data-also-grade="${esc(g)}">Весь ${esc(g)} класс</button>`).join("")}<button type="button" data-also-none>Снять всё</button></div>`
+        + list.map(u => `<label><input type="checkbox" name="also" value="${esc(u.username)}"${checked.has(u.username) ? " checked" : ""}> ${esc(u.name)}${u.grade ? `, ${esc(u.grade)} кл.` : ""}</label>`).join("")
+        : '<span class="muted small">Других учеников нет.</span>';
+}
+document.querySelector("[data-also]")?.addEventListener("click", e => {
+    const g = e.target.closest("[data-also-grade]"), none = e.target.closest("[data-also-none]");
+    if (!g && !none) return;
+    document.querySelectorAll("[data-also] input").forEach(i => {
+        if (none) i.checked = false;
+        else if (String((state.users.find(u => u.username === i.value) || {}).grade) === g.dataset.alsoGrade) i.checked = true;
+    });
+});
+document.getElementById("studentSelect").addEventListener("change", fillAlsoStudents);
 
 if (adminUser) loadData();
 

@@ -123,6 +123,10 @@ const ADMIN_RECORDS = {
   }]
 };
 
+// Какие записи можно править и каким проверочным правилом (то же, что при добавлении).
+const EDITABLE = { materials:"addMaterial", homework:"addHomework", schedule:"addEvent", grades:"addGrade", lessonNotes:"addLessonNote",
+  payments:"addPayment", achievements:"addAchievement", problems:"addProblem" };
+
 async function dispatch(b, user, p) {
   const action = String(p.action || "");
   const isAdmin = user.role === "admin";
@@ -143,8 +147,30 @@ async function dispatch(b, user, p) {
     }
     case "addMessage": {
       const data = { from:user.username, to:required(p.to,"Получатель",40), text:required(p.text,"Сообщение",2000), date:today(), isRead:false };
+      if (data.to === user.username) throw new Error("Нельзя отправить сообщение самому себе.");
       const id = await b.add("messages", data);
       return { ok:true, item:Object.assign({ id }, data) };
+    }
+    // Сообщение удаляет репетитор (любое) или отправитель (своё) — вместе с прикреплёнными файлами.
+    case "deleteMessage": {
+      const id = String(p.id || "");
+      if (!id) throw new Error("Сообщение не найдено.");
+      if (!isAdmin && p.from !== user.username) throw new Error("Удалить можно только своё сообщение.");
+      await b.removeFiles(await b.filesOf("message", id, isAdmin ? "" : user.username));
+      await b.remove("messages", id);
+      return { ok:true };
+    }
+    // Правка любой записи репетитором: те же проверки, что при добавлении; статус задания и события сохраняется.
+    case "updateRow": {
+      needAdmin();
+      const sheet = String(p.sheet || ""), id = String(p.id || "");
+      const action = EDITABLE[sheet];
+      if (!action || !id) throw new Error("Эту запись нельзя изменить.");
+      const record = ADMIN_RECORDS[action](p)[1];
+      if (sheet === "homework") record.status = oneOf(p.status || "pending", ["pending", "done"], "Статус");
+      if (sheet === "schedule") record.status = oneOf(p.status || "planned", ["planned", "done", "cancelled"], "Статус");
+      await b.update(sheet, id, record);
+      return { ok:true, item:Object.assign({ id }, record) };
     }
     case "markMessagesRead":
       return { ok:true, count:await b.markRead(user) };
@@ -392,7 +418,7 @@ function humanError(e) {
 /* ---------- Бэкенды ---------- */
 
 export function emptyDataset() {
-  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], practiceResults:[], testKeys:{} };
+  return { settings:{ year:2026 }, users:[], materials:[], homework:[], schedule:[], grades:[], lessonNotes:[], payments:[], achievements:[], messages:[], topics:[], files:[], tests:[], testResults:[], problems:[], practiceResults:[], directory:[], testKeys:{} };
 }
 export function publicUser(u) {
   return { username:String(u.username || ""), name:String(u.name || ""), role:String(u.role || "student"), grade:u.grade == null ? "" : u.grade, child:String(u.child || ""), nameGen:String(u.nameGen || "") };
@@ -418,6 +444,18 @@ async function createFirebaseBackend() {
   const col = name => F.collection(db, name);
   const rows = async q => (await F.getDocs(q)).docs.map(d => Object.assign({ id:d.id }, d.data()));
   const profile = async name => { const s = await F.getDoc(F.doc(db, "users", name)); return s.exists() ? s.data() : null; };
+  // Справочник имён (directory) повторяет users: лишнее удаляем, недостающее и изменённое записываем.
+  const syncDirectory = async users => {
+    const current = await rows(col("directory"));
+    const want = new Map(users.map(u => [u.username, { name:u.name || u.username, role:u.role }]));
+    const have = new Map(current.map(d => [d.id, d]));
+    const batch = F.writeBatch(db);
+    let changes = 0;
+    want.forEach((v, k) => { const h = have.get(k); if (!h || h.name !== v.name || h.role !== v.role) { batch.set(F.doc(db, "directory", k), v); changes++; } });
+    have.forEach((_, k) => { if (!want.has(k)) { batch.delete(F.doc(db, "directory", k)); changes++; } });
+    if (changes) await batch.commit();
+    return [...want.entries()].map(([id, v]) => Object.assign({ id }, v));
+  };
   const signedIn = async () => {
     await auth.authStateReady();
     if (!auth.currentUser) throw new Error("Сессия истекла. Войдите снова.");
@@ -459,6 +497,7 @@ async function createFirebaseBackend() {
         names.forEach((c, i) => { data[c] = lists[i]; });
         data.testKeys = Object.fromEntries(data.testKeys.map(k => [k.id, k.answers]));
         data.users = data.users.map(publicUser);
+        data.directory = await syncDirectory(data.users).catch(() => data.users.map(u => ({ id:u.username, name:u.name, role:u.role })));
         return data;
       }
       // Ученик и родитель запрашивают только записи своего ученика — ровно то, что разрешают правила.
@@ -487,6 +526,7 @@ async function createFirebaseBackend() {
       const files = new Map();
       fileLists.flat().forEach(f => files.set(f.id, f));
       // Тесты: общие и свои; результаты своего ученика; ключи — только к уже сданным тестам.
+      const directory = await rows(col("directory")).catch(() => []);
       const [tests, testResults, problems, practiceResults] = await Promise.all([
         rows(F.query(col("tests"), student ? F.where("student","in",["", student]) : F.where("student","==",""))),
         student ? rows(F.query(col("testResults"), F.where("student","==",student))) : Promise.resolve([]),
@@ -506,7 +546,7 @@ async function createFirebaseBackend() {
         homework, schedule, grades, lessonNotes, payments, achievements, topics,
         messages:[...messages.values()].sort(byDate),
         files:[...files.values()],
-        tests, testResults, problems, practiceResults, testKeys
+        tests, testResults, problems, practiceResults, testKeys, directory
       });
       return data;
     },
@@ -558,9 +598,10 @@ async function createFirebaseBackend() {
       const k = await F.getDoc(F.doc(db, "testKeys", r.testId));
       return k.exists() ? k.data().answers : null;
     },
-    async filesOf(kind, parentId) {
+    async filesOf(kind, parentId, from = "") {
       await signedIn();
-      return rows(F.query(col("files"), F.where("kind","==",kind), F.where("parentId","==",parentId)));
+      return rows(from ? F.query(col("files"), F.where("kind","==",kind), F.where("from","==",from), F.where("parentId","==",parentId))
+        : F.query(col("files"), F.where("kind","==",kind), F.where("parentId","==",parentId)));
     },
     async removeFiles(list) {
       await signedIn();
@@ -574,8 +615,7 @@ async function createFirebaseBackend() {
 
     async markRead(user) {
       await signedIn();
-      const party = [...new Set([user.username, user.role === "parent" ? user.child : ""].filter(Boolean))];
-      const snap = await F.getDocs(F.query(col("messages"), F.where("to","in",party), F.where("isRead","==",false)));
+      const snap = await F.getDocs(F.query(col("messages"), F.where("to","==",user.username), F.where("isRead","==",false)));
       const unread = snap.docs.filter(d => d.data().from !== user.username);
       if (unread.length) {
         const batch = F.writeBatch(db);
