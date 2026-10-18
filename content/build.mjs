@@ -1,8 +1,11 @@
 // Генератор учебной базы: банк задач, тесты и материалы-шпаргалки для 5–11 классов.
 // Ответы вычисляются кодом (а не пишутся вручную), решения — пошагово в LaTeX ($…$).
 // Запуск: node content/build.mjs  →  content/content.json (затем content/upload.mjs).
-// Генерация детерминированная: одинаковый результат при каждом запуске.
+// Банк задач детерминированный (ответы в нём открыты для самопроверки). Вопросы тестов — ОТДЕЛЬНЫЕ задачи,
+// которых нет в банке, из секретного зерна (CONTENT_TEST_SEED или случайного): репозиторий публичный,
+// поэтому ответы тестов нельзя выводить из кода. content.json в git не хранится.
 import { writeFileSync } from "node:fs";
+import { randomInt } from "node:crypto";
 
 /* ---------- Инструменты ---------- */
 
@@ -22,17 +25,23 @@ const fracTex = (p, q) => { [p, q] = frac(p, q); return q === 1 ? String(p) : `$
 const sgn = (n, first = false) => n < 0 ? `- ${-n}` : first ? `${n}` : `+ ${n}`;
 const term = (k, v, first = false) => k === 0 ? "" : `${k < 0 ? (first ? "-" : "- ") : first ? "" : "+ "}${Math.abs(k) === 1 ? "" : Math.abs(k)}${v}`;
 
-const problems = [];
-let pid = 0;
-function add(topic, grade, difficulty, gen, count) {
-  const seen = new Set();
-  for (let i = 0, guard = 0; i < count && guard < count * 30; guard++) {
-    const p = gen(i);
-    if (!p || seen.has(p.text)) continue;
-    seen.add(p.text);
-    problems.push({ id:`seed-p${String(++pid).padStart(3, "0")}`, topic, grade, difficulty:p.difficulty || difficulty, text:p.text, answer:String(p.answer), solution:p.solution || "" });
-    i++;
+// add() только описывает тему; задачи создаёт generate() — для банка и, отдельно, для тестов.
+const defs = [];
+function add(topic, grade, difficulty, gen, count) { defs.push({ topic, grade, difficulty, gen, count }); }
+function generate(seedValue, exclude, idPrefix) {
+  seed = seedValue;
+  const out = [];
+  for (const d of defs) {
+    const seen = new Set();
+    for (let i = 0, guard = 0; i < d.count && guard < d.count * 30; guard++) {
+      const p = d.gen(i);
+      if (!p || seen.has(p.text) || exclude.has(p.text)) continue;
+      seen.add(p.text);
+      out.push({ id:`${idPrefix}${String(out.length + 1).padStart(3, "0")}`, topic:d.topic, grade:d.grade, difficulty:p.difficulty || d.difficulty, text:p.text, answer:String(p.answer), solution:p.solution || "" });
+      i++;
+    }
   }
+  return out;
 }
 
 /* ---------- 5 класс ---------- */
@@ -332,16 +341,20 @@ const CONCEPTS = {
       { text:"Чему равна производная функции $y = 5x$?", type:"number", options:[], answer:"5" }]
 };
 
+const problems = generate(20261018, new Set(), "seed-p");
+const testSeed = Number(process.env.CONTENT_TEST_SEED) || randomInt(1, 2 ** 31);
+const testPool = generate(testSeed, new Set(problems.map(p => p.text)), "t");
+
 const tests = [];
-const byGrade = g => problems.filter(p => p.grade === g);
+const byGrade = g => testPool.filter(p => p.grade === g);
 for (const g of [5, 6, 7, 8, 9, 10, 11]) {
   const pool = byGrade(g), topics = [...new Set(pool.map(p => p.topic))];
   const halves = [topics.filter((_, i) => i % 2 === 0), topics.filter((_, i) => i % 2 === 1)];
   halves.forEach((part, n) => {
     if (!part.length) return;
-    // Из каждой темы — по одной-две задачи (не те же, что первые в банке), плюс вопросы на понимание.
+    // Из каждой темы — по две задачи, которых нет в банке, плюс вопросы на понимание.
     const qs = [];
-    part.forEach(t => pool.filter(p => p.topic === t).slice(-2).forEach(p => qs.push({ text:p.text, type:"number", options:[], answer:p.answer })));
+    part.forEach(t => pool.filter(p => p.topic === t).slice(0, 2).forEach(p => qs.push({ text:p.text, type:"number", options:[], answer:p.answer })));
     const fromBank = qs.filter(q => !/[a-zа-я]/i.test(q.answer.replace(/[\d,/;\-\s]/g, ""))).slice(0, 7);
     const concept = CONCEPTS[g].filter((_, i) => i % 2 === n || CONCEPTS[g].length < 3);
     const questions = [...fromBank, ...concept].slice(0, 10);

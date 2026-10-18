@@ -13,3 +13,6 @@ sheets-export*.json
 # Cloudflare Worker: локальные секреты и кэш wrangler
 worker/.dev.vars
 worker/.wrangler/
+
+# Сгенерированная учебная база: в ней ответы тестов — не публиковать (репозиторий открытый)
+content/content.json

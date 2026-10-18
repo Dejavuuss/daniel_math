@@ -24,9 +24,10 @@ for (const p of problems) {
 }
 
 // Независимый пересчёт: разбираем условие и решаем заново.
+// Пересчитываем и задачи банка, и числовые вопросы тестов.
 let rechecked = 0;
-const tex = s => s.replace(/\\cdot/g, "*").replace(/\s+/g, "");
-for (const p of problems) {
+const testItems = tests.flatMap(t => t.questions.map((q, i) => ({ id:`${t.id}#${i + 1}`, text:q.text, answer:t.answers[i], type:q.type })).filter(q => q.type === "number"));
+for (const p of [...problems, ...testItems]) {
   const t = p.text, a = n(p.answer);
   let expect = null, m;
   if ((m = /^Вычислите: \$(-?\d+) \+ (\d+) \\cdot (\d+)\$\.$/.exec(t))) expect = +m[1] + m[2] * m[3];
@@ -73,6 +74,6 @@ for (const m of materials) {
   if (!["material", "video", "test", "worksheet"].includes(m.type)) err(m.id, "тип");
 }
 
-console.log(`Задач: ${problems.length}, из них ответ пересчитан независимо: ${rechecked}. Тестов: ${tests.length}. Материалов: ${materials.length}.`);
+console.log(`Задач: ${problems.length}, вопросов тестов: ${testItems.length}; ответов пересчитано независимо: ${rechecked}. Тестов: ${tests.length}. Материалов: ${materials.length}.`);
 console.log(errors.length ? `Ошибок: ${errors.length}\n` + errors.join("\n") : "Ошибок нет");
 process.exitCode = errors.length ? 1 : 0;
