@@ -1,6 +1,6 @@
 # Задачи проекта
 
-Сайт опубликован: https://dejavuuss.github.io/daniel_math/ (ветка `main`). Статусы: ✅ сделано · ⏳ нужно сделать вам · 💡 идеи на потом.
+Сайт опубликован в двух местах: https://dejavuuss.github.io/daniel_math/ (ветка `main`) и https://math-site-b8713.web.app (Firebase Hosting — обновлять командой `firebase deploy --only hosting` при каждой публикации). Статусы: ✅ сделано · ⏳ нужно сделать вам · 💡 идеи на потом.
 
 ## 1. Переезд с Google Sheets на Firebase
 
